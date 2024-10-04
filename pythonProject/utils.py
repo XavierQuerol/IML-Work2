@@ -1,5 +1,6 @@
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 
 
@@ -57,14 +58,27 @@ def one_hot_encoding(df_train, df_test):
   df_test = pd.concat([df_test, df_test_encoded], axis=1)
   return df_train, df_test
 
-def binary_encoding(df):
+def binary_encoding(df_train, df_test):
     # select binary features
-    binary_features = df.select_dtypes(include=['object']).nunique()[lambda x: x <= 2].index.tolist()
+    binary_features = df_train.select_dtypes(include=['object']).nunique()[lambda x: x <= 2].index.tolist()
 
-    # binary
-    df[binary_features] = df[binary_features].replace({'t': 1, 'sick':1, 'f': 0, 'negative': 0})
- 
-    return df
+    label_encoders = {}
+
+    for feature in binary_features:
+        label_encoder = LabelEncoder()
+
+        # Fit the encoder only to the training data
+        label_encoder.fit(df_train[feature])
+
+        # Store the encoder in the dictionary
+        label_encoders[feature] = label_encoder
+
+        # Transform the training and test data
+        df_train[feature] = label_encoder.transform(df_train[feature])
+        df_test[feature] = label_encoder.transform(df_test[feature])
+
+    return df_train, df_test
+
 
 def fill_nans(df_train, df_test, columns_predict):
 
