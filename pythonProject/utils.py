@@ -15,9 +15,7 @@ def drop_rows(df, column_names):
 Applies a minmaxscaler to all numerical columns.
 If it finds a nan in a numerical column it removes the instance.
 """
-def min_max_scaler(df_train, df_test):
-
-    numerical_cols = df_train.select_dtypes(include=['float64', 'int64']).columns
+def min_max_scaler(df_train, df_test, numerical_cols):
 
     #Drop NaNs
     df_train = df_train.dropna(subset=numerical_cols)
@@ -26,11 +24,11 @@ def min_max_scaler(df_train, df_test):
     scaler = MinMaxScaler()
 
     # Scaler Training with all the train and test information.
-    scaler.fit(pd.concat([df_train[numerical_cols], df_test[numerical_cols]]))
+    scaler.fit(pd.concat((df_train[numerical_cols], df_test[numerical_cols])))
 
     # Scale train and test data separately
-    df_train[numerical_cols] = scaler.transform(df_train[numerical_cols])
-    df_test[numerical_cols] = scaler.transform(df_test[numerical_cols])
+    df_train.loc[:, numerical_cols] = scaler.transform(df_train[numerical_cols])
+    df_test.loc[:, numerical_cols] = scaler.transform(df_test[numerical_cols])
 
     return df_train, df_test
 
@@ -69,15 +67,18 @@ def binary_encoding(df_train, df_test):
 
     return df_train, df_test
 
-def fill_nans(df_train, df_test, columns_train, columns_predict):
+def fill_nans(df_train, df_test, columns_predict):
+
     model = LinearRegression()
+
+    columns_train = [col for col in df_train.columns if col not in columns_predict]
 
     x = pd.concat((df_train[columns_train], df_test[columns_train]))
     y = pd.concat((df_train[columns_predict], df_test[columns_predict]))
 
     model.fit(x, y)
 
-    df_train[columns_predict] = model.predict(df_train[columns_train])
-    df_test[columns_predict] = model.predict(df_test[columns_train])
+    df_train.loc[:, columns_predict] = model.predict(df_train[columns_train])
+    df_test.loc[:, columns_predict] = model.predict(df_test[columns_train])
 
     return df_train, df_test
