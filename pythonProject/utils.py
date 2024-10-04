@@ -17,14 +17,19 @@ If it finds a nan in a numerical column it removes the instance.
 """
 def min_max_scaler(df_train, df_test):
 
-    scaler = MinMaxScaler()
     numerical_cols = df_train.select_dtypes(include=['float64', 'int64']).columns
 
     #Drop NaNs
     df_train = df_train.dropna(subset=numerical_cols)
     df_test = df_test.dropna(subset=numerical_cols)
 
-    df_train[numerical_cols] = scaler.fit_transform(df_train[numerical_cols])
+    scaler = MinMaxScaler()
+
+    # Scaler Training with all the train and test information.
+    scaler.fit(pd.concat([df_train[numerical_cols], df_test[numerical_cols]]))
+
+    # Scale train and test data separately
+    df_train[numerical_cols] = scaler.transform(df_train[numerical_cols])
     df_test[numerical_cols] = scaler.transform(df_test[numerical_cols])
 
     return df_train, df_test
