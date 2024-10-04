@@ -5,11 +5,12 @@ import pandas as pd
 
 
 def drop_columns(df, column_names):
-    df = df.remove(column_names = column_names)
+    df = df.drop(columns = column_names)
     return df
 
 def drop_rows(df, column_names):
-    df = df.dropna(subset=[column_names])
+    df = df.dropna(subset=column_names)
+    df = df.reset_index(drop=True)
     return df
 
 """
@@ -17,10 +18,6 @@ Applies a minmaxscaler to all numerical columns.
 If it finds a nan in a numerical column it removes the instance.
 """
 def min_max_scaler(df_train, df_test, numerical_cols):
-
-    #Drop NaNs
-    df_train = df_train.dropna(subset=numerical_cols)
-    df_test = df_test.dropna(subset=numerical_cols)
 
     scaler = MinMaxScaler()
 
@@ -68,7 +65,7 @@ def binary_encoding(df_train, df_test):
         label_encoder = LabelEncoder()
 
         # Fit the encoder only to the training data
-        label_encoder.fit(df_train[feature])
+        label_encoder.fit(pd.concat([df_train[feature], df_test[feature]]))
 
         # Store the encoder in the dictionary
         label_encoders[feature] = label_encoder
@@ -85,13 +82,17 @@ def fill_nans(df_train, df_test, columns_predict):
     model = LinearRegression()
 
     columns_train = [col for col in df_train.columns if col not in columns_predict]
+    for col in columns_predict:
+        df_train_model = df_train.dropna(subset=[col])
+        df_train_nans = df_train[df_train[col].isna()]
+        df_test_model = df_test.dropna(subset=[col])
+        df_test_nans = df_test[df_train[col].isna()]
+        x = pd.concat((df_train_model[columns_train], df_test_model[columns_train]))
+        y = pd.concat((df_train_model[col], df_test_model[col]))
 
-    x = pd.concat((df_train[columns_train], df_test[columns_train]))
-    y = pd.concat((df_train[columns_predict], df_test[columns_predict]))
+        model.fit(x, y)
 
-    model.fit(x, y)
-
-    df_train.loc[:, columns_predict] = model.predict(df_train[columns_train])
-    df_test.loc[:, columns_predict] = model.predict(df_test[columns_train])
+        df_train.loc[df_train_nans.index, col] = model.predict(df_train_nans[columns_train])
+        df_test.loc[df_test_nans.index, col] = model.predict(df_test_nans[columns_train])
 
     return df_train, df_test
