@@ -1,7 +1,9 @@
+from scipy.spatial.distance import minkowski
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
 import pandas as pd
+import numpy as np
 
 
 def drop_columns(df, column_names):
@@ -96,3 +98,75 @@ def fill_nans(df_train, df_test, columns_predict):
         df_test.loc[df_test_nans.index, col] = model.predict(df_test_nans[columns_train])
 
     return df_train, df_test
+
+
+## SESSION 2:
+
+# KNN
+
+class KNN:
+    def __init__(self, k=3):
+        self.k = k
+        self.X_train = None
+        self.y_train = None
+
+    def fit(self, X_train, y_train):
+
+        self.X_train = X_train
+        self.y_train = y_train
+
+    def predict(self, X_test, distance_function: callable(), voting_function: callable()):
+
+        # Use numpy
+        predictions = [self._predict(x, distance_function, voting_function) for x in X_test]
+        return predictions
+
+    def _predict(self, x, distance_function: callable(), voting_function: callable()):
+
+        # Calculate distances between x and all examples in the training set
+        # Use numpy
+        distances = [distance_function(x, x_train) for x_train in self.X_train]
+
+        # Get the indices of the k-nearest neighbors
+        sorted_indices  = np.argsort(distances)
+
+        k_indices = sorted_indices[:self.k]
+        k_nearest_distances = distances[sorted_indices[:self.k]]
+        k_nearest_labels = [self.y_train[i] for i in k_indices]
+
+        # Choose between voting schemes
+        predicted_class = voting_function(k_nearest_distances, k_nearest_labels)
+        return predicted_class
+
+# Distance Metrics:
+def minkowski2(a,b) :
+    return minkowski(a,b,2)
+
+def minkowski1(a,b):
+    return minkowski(a,b,1)
+
+def minkowski(a, b, r):
+    pass
+
+def metric2(a, b):
+    pass
+
+# Voting schemes
+
+# distances: list of distances to the k nearest neighbours
+# classes: list of classes of the k nearest neighbours
+def majority_class(distances, classes):
+    # Tie breaking
+    pass
+
+# distances: list of distances to the k nearest neighbours
+# classes: list of classes of the k nearest neighbours
+def inverse_distance_weight(distances, classes):
+    # Tie breaking
+    pass
+
+# distances: list of distances to the k nearest neighbours
+# classes: list of classes of the k nearest neighbours
+def sheppards_work(distances, classes):
+    # Tie breaking
+    pass
