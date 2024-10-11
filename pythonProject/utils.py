@@ -115,13 +115,13 @@ class KNN:
         self.X_train = X_train
         self.y_train = y_train
 
-    def predict(self, X_test, distance_function: callable(), voting_function: callable()):
+    def predict(self, X_test, distance_function, voting_function):
 
         # Use numpy
         predictions = [self._predict(x, distance_function, voting_function) for x in X_test]
         return predictions
 
-    def _predict(self, x, distance_function: callable(), voting_function: callable()):
+    def _predict(self, x, distance_function, voting_function):
 
         # Calculate distances between x and all examples in the training set
         # Use numpy
@@ -153,20 +153,81 @@ def metric2(a, b):
 
 # Voting schemes
 
-# distances: list of distances to the k nearest neighbours
-# classes: list of classes of the k nearest neighbours
-def majority_class(distances, classes):
-    # Tie breaking
-    pass
+# Common helper to handle tie-breaking
+def handle_tie(classes, metric):
+    return classes[np.argmax(metric)]  # Breaking ties by the largest metric
+
 
 # distances: list of distances to the k nearest neighbours
 # classes: list of classes of the k nearest neighbours
-def inverse_distance_weight(distances, classes):
-    # Tie breaking
-    pass
+# class_weights: dictionary of class weights (optional)
+def majority_class(distances, classes, class_weights=None):
+    unique_classes, count = np.unique(classes, return_counts=True)
+
+    # Apply class weights if provided
+    if class_weights is not None:
+        count = np.array([count[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+
+    max_count = np.max(count)
+    max_class = unique_classes[count == max_count]
+
+    if len(max_class) == 1:
+        return max_class[0]
+
+    # Tie breaking by average distance
+    avg_distances = np.array([np.mean(distances[classes == cls]) for cls in max_class])
+    max_class = handle_tie(max_class, -avg_distances)
+
+    return max_class
+
 
 # distances: list of distances to the k nearest neighbours
 # classes: list of classes of the k nearest neighbours
-def sheppards_work(distances, classes):
-    # Tie breaking
-    pass
+# class_weights: dictionary of class weights (optional)
+def inverse_distance_weight(distances, classes, class_weights=None):
+    unique_classes = np.unique(classes)
+    metric = np.zeros(len(unique_classes))
+
+    for i, cls in enumerate(unique_classes):
+        d = distances[classes == cls]
+        metric[i] = np.sum(1 / d)
+
+    # Apply class weights if provided
+    if class_weights is not None:
+        metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+
+    max_count = np.max(metric)
+    max_class = unique_classes[metric == max_count]
+
+    if len(max_class) == 1:
+        return max_class[0]
+
+    # Tie breaking by the metric
+    max_class = handle_tie(max_class, metric)
+    return max_class
+
+
+# distances: list of distances to the k nearest neighbours
+# classes: list of classes of the k nearest neighbours
+# class_weights: dictionary of class weights (optional)
+def sheppards_work(distances, classes, class_weights=None):
+    unique_classes = np.unique(classes)
+    metric = np.zeros(len(unique_classes))
+
+    for i, cls in enumerate(unique_classes):
+        d = distances[classes == cls]
+        metric[i] = np.sum(np.exp(-d))
+
+    # Apply class weights if provided
+    if class_weights is not None:
+        metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+
+    max_count = np.max(metric)
+    max_class = unique_classes[metric == max_count]
+
+    if len(max_class) == 1:
+        return max_class[0]
+
+    # Tie breaking by the metric
+    max_class = handle_tie(max_class, metric)
+    return max_class
