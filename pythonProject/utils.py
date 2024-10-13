@@ -165,7 +165,7 @@ def metric(a, b):
     distance = 0
 
     for i in range(num_features):
-        if all(x in (0, 1) for x in [a[i], b[i]]):  # check if both are 0 or 1
+        if all(x in (0, 1) for x in [a[i], b[i]]):  # check if both are 0 or 1 tp see if they are categorical
             # Overlap metric for categorical features
             distance += (a[i] != b[i])  # 1 if different, 0 if same
         else:
