@@ -139,17 +139,40 @@ class KNN:
         return predicted_class
 
 # Distance Metrics:
-def minkowski2(a,b) :
-    return minkowski(a,b,2)
+# Distance Metrics:
+def minkowski2(a, b):
+    return minkowski(a, b, 2)
 
-def minkowski1(a,b):
-    return minkowski(a,b,1)
+
+def minkowski1(a, b):
+    return minkowski(a, b, 1)
+
 
 def minkowski(a, b, r):
-    pass
+    a = np.asarray(a)
+    b = np.asarray(b)
+    return np.sum(np.abs(a - b) ** r) ** (1 / r)
 
-def metric2(a, b):
-    pass
+
+def metric(a, b):
+    """Heterogeneous Euclidean-Overlap Metric (HEOM) distance, because it takes into account if
+    features are numerical or categorical.
+    """
+    a = np.asarray(a)
+    b = np.asarray(b)
+
+    num_features = len(a)
+    distance = 0
+
+    for i in range(num_features):
+        if all(x in (0, 1) for x in [a[i], b[i]]):  # check if both are 0 or 1
+            # Overlap metric for categorical features
+            distance += (a[i] != b[i])  # 1 if different, 0 if same
+        else:
+            # Euclidean distance for numerical features
+            distance += (a[i] - b[i]) ** 2
+
+    return np.sqrt(distance)
 
 # Voting schemes
 
