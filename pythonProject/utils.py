@@ -2,6 +2,8 @@ from scipy.spatial.distance import minkowski
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_selection import mutual_info_classif, f_classif, SelectKBest
+from sklearn_relief import Relief
 import pandas as pd
 import numpy as np
 
@@ -19,7 +21,7 @@ def drop_rows(df, column_names):
 Applies a minmaxscaler to all numerical columns.
 If it finds a nan in a numerical column it removes the instance.
 """
-def min_max_scaler(df_train, df_test, numerical_cols):
+def min_max_scaler(df_train, df_test, numerical_cols=slice(None)):
 
     scaler = MinMaxScaler()
 
@@ -254,3 +256,45 @@ def sheppards_work(distances, classes, class_weights=None):
     # Tie breaking by the metric
     max_class = handle_tie(max_class, metric)
     return max_class
+
+
+## Weighting:
+def update_weights_mutual_classifier(X_train, y_train, X_test):
+
+    # Compute information gain
+    mi = mutual_info_classif(X_train, y_train)
+
+    # Scale the values of the columns by their information gain.
+    X_train_weighted = X_train * mi
+    X_test_weighted = X_test * mi
+
+    # Optionally normalize features if necessary (like Standardization)
+    X_train_weighted, X_test_weighted = min_max_scaler(X_train_weighted, X_test_weighted)
+
+    return X_train_weighted, X_test_weighted
+
+# We have to use Relief and not Relieff because our problems have only 2 classes.
+# The core idea behind Relief algorithms is to estimate the quality of attributes on the basis of how well the attribute can distinguish between instances that are near to each other.
+# https://medium.com/@yashdagli98/feature-selection-using-relief-algorithms-with-python-example-3c2006e18f83
+def update_weights_relief(X_train, y_train, X_test):
+
+    relief = Relief()
+    relief.fit(X_train, y_train)
+    X_train_weighted = relief.transform(X_train)
+    X_test_weighted = relief.transform(X_test)
+
+    return X_train_weighted, X_test_weighted
+
+# Only works with numeric data
+# Ranks features by how much they distinguish between the target classes based on variance between groups
+def update_weights_anova(X_train, y_train, X_test, k=10):
+
+    selector = SelectKBest(score_func=f_classif, k=k)
+    selector.fit(X_train, y_train)
+
+    selected_features_mask = selector.get_support()
+
+    X_train_selected = X_train.loc[:, selected_features_mask]
+    X_test_selected = X_test.loc[:, selected_features_mask]
+
+    return X_train_selected, X_test_selected
