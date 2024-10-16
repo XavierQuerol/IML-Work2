@@ -1,4 +1,7 @@
+import time
+
 from scipy.spatial.distance import minkowski
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
@@ -104,30 +107,58 @@ def fill_nans(df_train, df_test, columns_predict):
 
 ## SESSION 2:
 
+def computeMetrics():
+    pass
+
+def callKNNs(X_train, X_test, y_train, y_test):
+    distance_functions = []
+    voting_schemes = []
+    weight_schemes = []
+    results = pd.DataFrame()
+
+    for dist_func in distance_functions:
+        for voting_scheme in voting_schemes:
+            for weight_scheme in weight_schemes:
+                start = time.time()
+                knn = KNN(dist_func, voting_scheme, weight_scheme,3)
+                knn.fit(X_train, y_train)
+                y_pred = knn.predict(X_test)
+                solving_time = time.time() - start
+                results.append({'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Metrics': computeMetrics(y_test,y_pred),'Solving Time': solving_time}) # Cambiar
+
 # KNN
 
 class KNN:
-    def __init__(self, k=3):
+    def __init__(self, distance_function, voting_scheme, weight_scheme, k=3):
         self.k = k
         self.X_train = None
         self.y_train = None
+
+        self.distance_functions = {'minkowski1': Distances.minkowski1, 'minkowski2': Distances.minkowski2, 'HEOM': Distances.HEOM}
+        self.voting_schemes = {'Majority_class': Voting_schemes.majority_class, 'Inverse_Distance_Weights': Voting_schemes.inverse_distance_weight, 'Sheppards_Work': Voting_schemes.sheppards_work}
+        self.weight_schemes = {'Mutual_classifier': Weighting.update_weights_mutual_classifier, 'Relief': Weighting.update_weights_relief, 'ANOVA': Weighting.update_weights_anova}
+
+        self.distance_function = self.distance_functions[distance_function]
+        self.voting_scheme = self.voting_schemes[voting_scheme]
+        self.weight_scheme = self.weight_schemes[weight_scheme]
 
     def fit(self, X_train, y_train):
 
         self.X_train = X_train
         self.y_train = y_train
 
-    def predict(self, X_test, distance_function, voting_function):
+    def predict(self, X_test):
 
         # Use numpy
-        predictions = [self._predict(x, distance_function, voting_function) for x in X_test]
+        self.weight_scheme(self.X_train, self.y_train, X_test)
+        predictions = [self._predict(x) for x in X_test]
         return predictions
 
-    def _predict(self, x, distance_function, voting_function):
+    def _predict(self, x):
 
         # Calculate distances between x and all examples in the training set
         # Use numpy
-        distances = [distance_function(x, x_train) for x_train in self.X_train]
+        distances = [self.distance_function(x, x_train) for x_train in self.X_train]
 
         # Get the indices of the k-nearest neighbors
         sorted_indices  = np.argsort(distances)
@@ -137,44 +168,44 @@ class KNN:
         k_nearest_labels = [self.y_train[i] for i in k_indices]
 
         # Choose between voting schemes
-        predicted_class = voting_function(k_nearest_distances, k_nearest_labels)
+        predicted_class = self.voting_scheme(k_nearest_distances, k_nearest_labels)
         return predicted_class
 
 # Distance Metrics:
 # Distance Metrics:
-def minkowski2(a, b):
-    return minkowski(a, b, 2)
+class Distances:
+    def minkowski2(self, a, b):
+        return minkowski(a, b, 2)
 
 
-def minkowski1(a, b):
-    return minkowski(a, b, 1)
+    def minkowski1(self, a, b):
+        return minkowski(a, b, 1)
 
 
-def minkowski(a, b, r):
-    a = np.asarray(a)
-    b = np.asarray(b)
-    return np.sum(np.abs(a - b) ** r) ** (1 / r)
+    def minkowski(self, a, b, r):
+        a = np.asarray(a)
+        b = np.asarray(b)
+        return np.sum(np.abs(a - b) ** r) ** (1 / r)
 
+    def HEOM(self, a, b):
+        """Heterogeneous Euclidean-Overlap Metric (HEOM) distance, because it takes into account if
+        features are numerical or categorical.
+        """
+        a = np.asarray(a)
+        b = np.asarray(b)
 
-def metric(a, b):
-    """Heterogeneous Euclidean-Overlap Metric (HEOM) distance, because it takes into account if
-    features are numerical or categorical.
-    """
-    a = np.asarray(a)
-    b = np.asarray(b)
+        num_features = len(a)
+        distance = 0
 
-    num_features = len(a)
-    distance = 0
+        for i in range(num_features):
+            if all(x in (0, 1) for x in [a[i], b[i]]):  # check if both are 0 or 1 tp see if they are categorical
+                # Overlap metric for categorical features
+                distance += (a[i] != b[i])  # 1 if different, 0 if same
+            else:
+                # Euclidean distance for numerical features
+                distance += (a[i] - b[i]) ** 2
 
-    for i in range(num_features):
-        if all(x in (0, 1) for x in [a[i], b[i]]):  # check if both are 0 or 1 tp see if they are categorical
-            # Overlap metric for categorical features
-            distance += (a[i] != b[i])  # 1 if different, 0 if same
-        else:
-            # Euclidean distance for numerical features
-            distance += (a[i] - b[i]) ** 2
-
-    return np.sqrt(distance)
+        return np.sqrt(distance)
 
 # Voting schemes
 
@@ -182,119 +213,117 @@ def metric(a, b):
 def handle_tie(classes, metric):
     return classes[np.argmax(metric)]  # Breaking ties by the largest metric
 
+class Voting_schemes:
+    # distances: list of distances to the k nearest neighbours
+    # classes: list of classes of the k nearest neighbours
+    # class_weights: dictionary of class weights (optional)
+    def majority_class(self, distances, classes, class_weights=None):
+        unique_classes, count = np.unique(classes, return_counts=True)
 
-# distances: list of distances to the k nearest neighbours
-# classes: list of classes of the k nearest neighbours
-# class_weights: dictionary of class weights (optional)
-def majority_class(distances, classes, class_weights=None):
-    unique_classes, count = np.unique(classes, return_counts=True)
+        # Apply class weights if provided
+        if class_weights is not None:
+            count = np.array([count[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
 
-    # Apply class weights if provided
-    if class_weights is not None:
-        count = np.array([count[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+        max_count = np.max(count)
+        max_class = unique_classes[count == max_count]
 
-    max_count = np.max(count)
-    max_class = unique_classes[count == max_count]
+        if len(max_class) == 1:
+            return max_class[0]
 
-    if len(max_class) == 1:
-        return max_class[0]
+        # Tie breaking by average distance
+        avg_distances = np.array([np.mean(distances[classes == cls]) for cls in max_class])
+        max_class = handle_tie(max_class, -avg_distances)
 
-    # Tie breaking by average distance
-    avg_distances = np.array([np.mean(distances[classes == cls]) for cls in max_class])
-    max_class = handle_tie(max_class, -avg_distances)
-
-    return max_class
-
-
-# distances: list of distances to the k nearest neighbours
-# classes: list of classes of the k nearest neighbours
-# class_weights: dictionary of class weights (optional)
-def inverse_distance_weight(distances, classes, class_weights=None):
-    unique_classes = np.unique(classes)
-    metric = np.zeros(len(unique_classes))
-
-    for i, cls in enumerate(unique_classes):
-        d = distances[classes == cls]
-        metric[i] = np.sum(1 / d)
-
-    # Apply class weights if provided
-    if class_weights is not None:
-        metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
-
-    max_count = np.max(metric)
-    max_class = unique_classes[metric == max_count]
-
-    if len(max_class) == 1:
-        return max_class[0]
-
-    # Tie breaking by the metric
-    max_class = handle_tie(max_class, metric)
-    return max_class
+        return max_class
 
 
-# distances: list of distances to the k nearest neighbours
-# classes: list of classes of the k nearest neighbours
-# class_weights: dictionary of class weights (optional)
-def sheppards_work(distances, classes, class_weights=None):
-    unique_classes = np.unique(classes)
-    metric = np.zeros(len(unique_classes))
+    # distances: list of distances to the k nearest neighbours
+    # classes: list of classes of the k nearest neighbours
+    # class_weights: dictionary of class weights (optional)
+    def inverse_distance_weight(self, distances, classes, class_weights=None):
+        unique_classes = np.unique(classes)
+        metric = np.zeros(len(unique_classes))
 
-    for i, cls in enumerate(unique_classes):
-        d = distances[classes == cls]
-        metric[i] = np.sum(np.exp(-d))
+        for i, cls in enumerate(unique_classes):
+            d = distances[classes == cls]
+            metric[i] = np.sum(1 / d)
 
-    # Apply class weights if provided
-    if class_weights is not None:
-        metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+        # Apply class weights if provided
+        if class_weights is not None:
+            metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
 
-    max_count = np.max(metric)
-    max_class = unique_classes[metric == max_count]
+        max_count = np.max(metric)
+        max_class = unique_classes[metric == max_count]
 
-    if len(max_class) == 1:
-        return max_class[0]
+        if len(max_class) == 1:
+            return max_class[0]
 
-    # Tie breaking by the metric
-    max_class = handle_tie(max_class, metric)
-    return max_class
+        # Tie breaking by the metric
+        max_class = handle_tie(max_class, metric)
+        return max_class
+
+
+    # distances: list of distances to the k nearest neighbours
+    # classes: list of classes of the k nearest neighbours
+    # class_weights: dictionary of class weights (optional)
+    def sheppards_work(self, distances, classes, class_weights=None):
+        unique_classes = np.unique(classes)
+        metric = np.zeros(len(unique_classes))
+
+        for i, cls in enumerate(unique_classes):
+            d = distances[classes == cls]
+            metric[i] = np.sum(np.exp(-d))
+
+        # Apply class weights if provided
+        if class_weights is not None:
+            metric = np.array([metric[i] * class_weights.get(cls, 1) for i, cls in enumerate(unique_classes)])
+
+        max_count = np.max(metric)
+        max_class = unique_classes[metric == max_count]
+
+        if len(max_class) == 1:
+            return max_class[0]
+
+        # Tie breaking by the metric
+        max_class = handle_tie(max_class, metric)
+        return max_class
 
 
 ## Weighting:
-def update_weights_mutual_classifier(X_train, y_train, X_test):
+class Weighting:
+    def update_weights_mutual_classifier(self, X_train, y_train, X_test):
 
-    # Compute information gain
-    mi = mutual_info_classif(X_train, y_train)
+        # Compute information gain
+        mi = mutual_info_classif(X_train, y_train)
 
-    # Scale the values of the columns by their information gain.
-    X_train_weighted = X_train * mi
-    X_test_weighted = X_test * mi
+        # Scale the values of the columns by their information gain.
+        X_train_weighted = X_train * mi
+        X_test_weighted = X_test * mi
 
-    # Optionally normalize features if necessary (like Standardization)
-    X_train_weighted, X_test_weighted = min_max_scaler(X_train_weighted, X_test_weighted)
+        return X_train_weighted, X_test_weighted
 
-    return X_train_weighted, X_test_weighted
+    # We have to use Relief and not Relieff because our problems have only 2 classes.
+    # The core idea behind Relief algorithms is to estimate the quality of attributes on the basis of how well the attribute can distinguish between instances that are near to each other.
+    # https://medium.com/@yashdagli98/feature-selection-using-relief-algorithms-with-python-example-3c2006e18f83
+    def update_weights_relief(self, X_train, y_train, X_test):
 
-# We have to use Relief and not Relieff because our problems have only 2 classes.
-# The core idea behind Relief algorithms is to estimate the quality of attributes on the basis of how well the attribute can distinguish between instances that are near to each other.
-# https://medium.com/@yashdagli98/feature-selection-using-relief-algorithms-with-python-example-3c2006e18f83
-def update_weights_relief(X_train, y_train, X_test):
+        relief = Relief()
+        relief.fit(X_train, y_train)
+        X_train_weighted = relief.transform(X_train)
+        X_test_weighted = relief.transform(X_test)
 
-    relief = Relief()
-    relief.fit(X_train, y_train)
-    X_train_weighted = relief.transform(X_train)
-    X_test_weighted = relief.transform(X_test)
+        return X_train_weighted, X_test_weighted
 
-    return X_train_weighted, X_test_weighted
+    # Only works with numeric data
+    # Ranks features by how much they distinguish between the target classes based on variance between groups
+    def update_weights_anova(self, X_train, y_train, X_test, k=10):
 
-# Only works with numeric data
-# Ranks features by how much they distinguish between the target classes based on variance between groups
-def update_weights_anova(X_train, y_train, X_test, k=10):
+        selector = SelectKBest(score_func=f_classif, k=k)
+        selector.fit(X_train, y_train)
 
-    selector = SelectKBest(score_func=f_classif, k=k)
-    selector.fit(X_train, y_train)
+        selected_features_mask = selector.get_support()
 
-    selected_features_mask = selector.get_support()
+        X_train_selected = X_train.loc[:, selected_features_mask]
+        X_test_selected = X_test.loc[:, selected_features_mask]
 
-    X_train_selected = X_train.loc[:, selected_features_mask]
-    X_test_selected = X_test.loc[:, selected_features_mask]
-
-    return X_train_selected, X_test_selected
+        return X_train_selected, X_test_selected
