@@ -7,6 +7,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_selection import mutual_info_classif, f_classif, SelectKBest
 from sklearn_relief import Relief
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import pandas as pd
 import numpy as np
 
@@ -38,12 +39,11 @@ def min_max_scaler(df_train, df_test, numerical_cols=slice(None)):
     return df_train, df_test
 
 def one_hot_encoding(df_train, df_test):
-  # select categorical features (excluding binary)
+  # select categorical features
   categorical_features = df_train.select_dtypes(include=['object']).nunique()[lambda x: x > 2].index.tolist()
 
-  # one hot encoding
   ohe = OneHotEncoder(handle_unknown='ignore')
-  # Correctly pass a list of dataframes to pd.concat
+
   ohe.fit(pd.concat([df_train[categorical_features], df_test[categorical_features]]))
 
   num_train = ohe.transform(df_train[categorical_features]).toarray()
@@ -57,9 +57,11 @@ def one_hot_encoding(df_train, df_test):
   # eliminate old features
   df_train = df_train.drop(categorical_features, axis=1)
   df_test = df_test.drop(categorical_features, axis=1)
+
   # add new features
-  df_train = pd.concat([df_train, df_train_encoded], axis=1)
-  df_test = pd.concat([df_test, df_test_encoded], axis=1)
+  df_train = df_train.join(df_train_encoded)
+  df_test = df_test.join(df_test_encoded)
+
   return df_train, df_test
 
 def binary_encoding(df_train, df_test):
@@ -107,24 +109,35 @@ def fill_nans(df_train, df_test, columns_predict):
 
 ## SESSION 2:
 
-def computeMetrics():
-    pass
+def computeMetrics(y_test, y_pred):
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='weighted')
+    recall = recall_score(y_test, y_pred, average='weighted')
+    f1 = f1_score(y_test, y_pred, average='weighted')
+
+    return accuracy, precision, recall, f1
 
 def callKNNs(X_train, X_test, y_train, y_test):
-    distance_functions = []
-    voting_schemes = []
-    weight_schemes = []
+    distance_functions = ['minkowski1']
+    voting_schemes = ['Majority_class']
+    weight_schemes = ['Mutual_classifier']
+    ks = [1]#[1,3,5,7]
     results = pd.DataFrame()
 
     for dist_func in distance_functions:
+        print(f"Using distance {dist_func}")
         for voting_scheme in voting_schemes:
+            print(f"Using voting {voting_scheme}")
             for weight_scheme in weight_schemes:
-                start = time.time()
-                knn = KNN(dist_func, voting_scheme, weight_scheme,3)
-                knn.fit(X_train, y_train)
-                y_pred = knn.predict(X_test)
-                solving_time = time.time() - start
-                results.append({'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Metrics': computeMetrics(y_test,y_pred),'Solving Time': solving_time}) # Cambiar
+                print(f"Using weighting {weight_scheme}")
+                for k in ks:
+                    start = time.time()
+                    knn = KNN(dist_func, voting_scheme, weight_scheme,k)
+                    knn.fit(X_train, y_train)
+                    y_pred = knn.predict(X_test)
+                    solving_time = time.time() - start
+                    accuracy, precision, recall, f1 = computeMetrics(y_test, y_pred)
+                    results.append({'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time})
 
 # KNN
 
@@ -132,6 +145,7 @@ class KNN:
     def __init__(self, distance_function, voting_scheme, weight_scheme, k=3):
         self.k = k
         self.X_train = None
+        self.X_train_weighted = None
         self.y_train = None
 
         self.distance_functions = {'minkowski1': Distances.minkowski1, 'minkowski2': Distances.minkowski2, 'HEOM': Distances.HEOM}
@@ -150,15 +164,15 @@ class KNN:
     def predict(self, X_test):
 
         # Use numpy
-        self.weight_scheme(self.X_train, self.y_train, X_test)
-        predictions = [self._predict(x) for x in X_test]
+        self.X_train_weighted, X_test = self.weight_scheme(self.X_train, self.y_train, X_test)
+        predictions = [self._predict(x) for x in X_test.values]
         return predictions
 
     def _predict(self, x):
 
         # Calculate distances between x and all examples in the training set
         # Use numpy
-        distances = [self.distance_function(x, x_train) for x_train in self.X_train]
+        distances = [self.distance_function(x, x_train) for x_train in self.X_train_weighted.values]
 
         # Get the indices of the k-nearest neighbors
         sorted_indices  = np.argsort(distances)
@@ -174,20 +188,31 @@ class KNN:
 # Distance Metrics:
 # Distance Metrics:
 class Distances:
-    def minkowski2(self, a, b):
-        return minkowski(a, b, 2)
+    @staticmethod
+    def minkowski2(a, b):
+        a = np.asarray(a,dtype=np.float64)
+        b = np.asarray(b,dtype=np.float64)
+
+        return np.sqrt(np.sum(np.power(np.abs(a - b),2)))
 
 
-    def minkowski1(self, a, b):
-        return minkowski(a, b, 1)
+    @staticmethod
+    def minkowski1(a, b):
+        a = np.asarray(a,dtype=np.float64)
+        b = np.asarray(b,dtype=np.float64)
+
+        return np.sum(np.abs(a - b))
 
 
-    def minkowski(self, a, b, r):
-        a = np.asarray(a)
-        b = np.asarray(b)
-        return np.sum(np.abs(a - b) ** r) ** (1 / r)
+    @staticmethod
+    def minkowski(a, b, p):
+        a = np.asarray(a,dtype=np.float64)
+        b = np.asarray(b,dtype=np.float64)
 
-    def HEOM(self, a, b):
+        return np.power(np.sum(np.power(np.abs(a - b),p)), (1 / p))
+
+    @staticmethod
+    def HEOM(a, b):
         """Heterogeneous Euclidean-Overlap Metric (HEOM) distance, because it takes into account if
         features are numerical or categorical.
         """
@@ -217,7 +242,8 @@ class Voting_schemes:
     # distances: list of distances to the k nearest neighbours
     # classes: list of classes of the k nearest neighbours
     # class_weights: dictionary of class weights (optional)
-    def majority_class(self, distances, classes, class_weights=None):
+    @staticmethod
+    def majority_class(distances, classes, class_weights=None):
         unique_classes, count = np.unique(classes, return_counts=True)
 
         # Apply class weights if provided
@@ -240,7 +266,8 @@ class Voting_schemes:
     # distances: list of distances to the k nearest neighbours
     # classes: list of classes of the k nearest neighbours
     # class_weights: dictionary of class weights (optional)
-    def inverse_distance_weight(self, distances, classes, class_weights=None):
+    @staticmethod
+    def inverse_distance_weight(distances, classes, class_weights=None):
         unique_classes = np.unique(classes)
         metric = np.zeros(len(unique_classes))
 
@@ -266,7 +293,8 @@ class Voting_schemes:
     # distances: list of distances to the k nearest neighbours
     # classes: list of classes of the k nearest neighbours
     # class_weights: dictionary of class weights (optional)
-    def sheppards_work(self, distances, classes, class_weights=None):
+    @staticmethod
+    def sheppards_work(distances, classes, class_weights=None):
         unique_classes = np.unique(classes)
         metric = np.zeros(len(unique_classes))
 
@@ -291,7 +319,8 @@ class Voting_schemes:
 
 ## Weighting:
 class Weighting:
-    def update_weights_mutual_classifier(self, X_train, y_train, X_test):
+    @staticmethod
+    def update_weights_mutual_classifier(X_train, y_train, X_test=None):
 
         # Compute information gain
         mi = mutual_info_classif(X_train, y_train)
@@ -305,7 +334,8 @@ class Weighting:
     # We have to use Relief and not Relieff because our problems have only 2 classes.
     # The core idea behind Relief algorithms is to estimate the quality of attributes on the basis of how well the attribute can distinguish between instances that are near to each other.
     # https://medium.com/@yashdagli98/feature-selection-using-relief-algorithms-with-python-example-3c2006e18f83
-    def update_weights_relief(self, X_train, y_train, X_test):
+    @staticmethod
+    def update_weights_relief(X_train, y_train, X_test=None):
 
         relief = Relief()
         relief.fit(X_train, y_train)
@@ -316,7 +346,8 @@ class Weighting:
 
     # Only works with numeric data
     # Ranks features by how much they distinguish between the target classes based on variance between groups
-    def update_weights_anova(self, X_train, y_train, X_test, k=10):
+    @staticmethod
+    def update_weights_anova(X_train, y_train, X_test=None, k=10):
 
         selector = SelectKBest(score_func=f_classif, k=k)
         selector.fit(X_train, y_train)

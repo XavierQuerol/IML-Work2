@@ -1,16 +1,39 @@
 #from preprocessing import preprocess, Load_Sick, Load_Grid
 from utils import callKNNs
+from preprocessing import preprocess_sick, preprocess_grid
+import pandas as pd
 
+def load_ds(name, num_folds=10):
+
+    folds_data = []
+
+    for fold in range(num_folds):
+
+        train_file = f'{name}_csv/{name}.fold.00000{fold}.train.csv'
+        test_file = f'{name}_csv/{name}.fold.00000{fold}.test.csv'
+
+        df_train = pd.read_csv(train_file)
+        df_test = pd.read_csv(test_file)
+
+        X_train = df_train.iloc[:, :-1]
+        y_train = df_train.iloc[:, -1]
+        X_test = df_test.iloc[:, :-1]
+        y_test = df_test.iloc[:, -1]
+
+        folds_data.append((X_train, X_test, y_train, y_test))
+
+    return folds_data
 
 def preprocess():
-    datasets = ['Sick', 'Grid']
-    preprocess_datasets(datasets) # Loads tiff and saves as csv
+    preprocess_sick()
+    preprocess_grid() # Loads tiff and saves as csv
 
 def main():
-    for cv in Load_Sick(): # Loads csv
-       X_train, X_test, y_train, y_test = cv
-       callKNNs(X_train, X_test, y_train, y_test)
+    datasets = ['sick', 'grid']
 
-    for cv in Load_Grid():
-       X_train, X_test, y_train, y_test = cv
-       callKNNs(X_train, X_test, y_train, y_test)
+    for ds in datasets:
+        print(f"Executing dataset {ds}")
+        for X_train, X_test, y_train, y_test in load_ds(ds): # Loads csv
+           callKNNs(X_train, X_test, y_train, y_test)
+
+main()
