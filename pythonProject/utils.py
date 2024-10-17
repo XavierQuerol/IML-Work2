@@ -1,7 +1,5 @@
 import time
 
-from scipy.spatial.distance import minkowski
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
@@ -118,19 +116,17 @@ def computeMetrics(y_test, y_pred):
     return accuracy, precision, recall, f1
 
 def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
-    distance_functions = ['minkowski1']
-    voting_schemes = ['Majority_class']
-    weight_schemes = ['Mutual_classifier']
-    ks = [1]#[1,3,5,7]
+    distance_functions = ['minkowski1','minkowski2','HEOM']
+    voting_schemes = ['Majority_class','Inverse_Distance_Weights','Sheppards_Work']
+    weight_schemes = ['Mutual_classifier','Relief','ANOVA']
+    ks = [3]#[1,3,5,7]
     results = pd.DataFrame(columns=['Distance', 'Voting scheme', 'Weight scheme', 'Accuracy', 'Precision', 'Recall', 'F1', 'Solving Time'])
 
     for dist_func in distance_functions:
-        print(f" -- Using distance {dist_func}")
         for voting_scheme in voting_schemes:
-            print(f" --- Using voting {voting_scheme}")
             for weight_scheme in weight_schemes:
-                print(f" ---- Using weighting {weight_scheme}")
                 for k in ks:
+                    print(f" - Using distance {dist_func} - voting {voting_scheme} - weighting {weight_scheme} - K {k}")
                     start = time.time()
                     knn = KNN(dist_func, voting_scheme, weight_scheme,k)
                     knn.fit(X_train, y_train)
@@ -139,7 +135,10 @@ def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
                     accuracy, precision, recall, f1 = computeMetrics(y_test, y_pred)
                     res = {'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time}
                     new_row = pd.DataFrame([res])
-                    results = pd.concat([results, new_row], ignore_index=True)
+
+                    results = pd.concat([results.astype(new_row.dtypes), new_row.astype(results.dtypes)], ignore_index=True)
+
+                    print(f"This combination took {solving_time} seconds")
 
     results.to_csv(f'results/results_{ds_name}_{fold}.csv', index=False)
 
@@ -268,7 +267,10 @@ class Voting_schemes:
 
         for i, cls in enumerate(unique_classes):
             d = distances[classes == cls]
-            metric[i] = np.sum(1 / d)
+
+            inverse_d = np.where(d != 0, 1 / d, 0)
+            metric[i] = np.sum(inverse_d)
+
 
         # Apply class weights if provided
         if class_weights is not None:
@@ -332,10 +334,16 @@ class Weighting:
     @staticmethod
     def update_weights_relief(X_train, y_train, X_test=None):
 
+        X_train_np = X_train.to_numpy()
+        y_train_np = y_train.to_numpy()
+        X_test_np = X_test.to_numpy()
+
         relief = Relief()
-        relief.fit(X_train, y_train)
-        X_train_weighted = relief.transform(X_train)
-        X_test_weighted = relief.transform(X_test)
+
+        X_train_weighted = relief.transform(X_train_np)
+        X_test_weighted = relief.transform(X_test_np)
+        X_train_weighted = pd.DataFrame(X_train_weighted)
+        X_test_weighted = pd.DataFrame(X_test_weighted)
 
         return X_train_weighted, X_test_weighted
 

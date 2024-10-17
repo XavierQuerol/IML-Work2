@@ -29,6 +29,7 @@ def preprocess():
     preprocess_grid() # Loads tiff and saves as csv
 
 def main():
+    print("MAIN")
     datasets = ['sick', 'grid']
 
     for ds in datasets:
@@ -37,4 +38,5 @@ def main():
             print(f"Fold {i}")
             callKNNs(X_train, X_test, y_train, y_test, ds, i)
 
-main()
+if __name__ == "__main__":
+    main()
