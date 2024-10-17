@@ -117,19 +117,19 @@ def computeMetrics(y_test, y_pred):
 
     return accuracy, precision, recall, f1
 
-def callKNNs(X_train, X_test, y_train, y_test):
+def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
     distance_functions = ['minkowski1']
     voting_schemes = ['Majority_class']
     weight_schemes = ['Mutual_classifier']
     ks = [1]#[1,3,5,7]
-    results = pd.DataFrame()
+    results = pd.DataFrame(columns=['Distance', 'Voting scheme', 'Weight scheme', 'Accuracy', 'Precision', 'Recall', 'F1', 'Solving Time'])
 
     for dist_func in distance_functions:
-        print(f"Using distance {dist_func}")
+        print(f" -- Using distance {dist_func}")
         for voting_scheme in voting_schemes:
-            print(f"Using voting {voting_scheme}")
+            print(f" --- Using voting {voting_scheme}")
             for weight_scheme in weight_schemes:
-                print(f"Using weighting {weight_scheme}")
+                print(f" ---- Using weighting {weight_scheme}")
                 for k in ks:
                     start = time.time()
                     knn = KNN(dist_func, voting_scheme, weight_scheme,k)
@@ -137,7 +137,11 @@ def callKNNs(X_train, X_test, y_train, y_test):
                     y_pred = knn.predict(X_test)
                     solving_time = time.time() - start
                     accuracy, precision, recall, f1 = computeMetrics(y_test, y_pred)
-                    results.append({'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time})
+                    res = {'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time}
+                    new_row = pd.DataFrame([res])
+                    results = pd.concat([results, new_row], ignore_index=True)
+
+    results.to_csv(f'results/results_{ds_name}_{fold}.csv', index=False)
 
 # KNN
 
@@ -172,7 +176,7 @@ class KNN:
 
         # Calculate distances between x and all examples in the training set
         # Use numpy
-        distances = [self.distance_function(x, x_train) for x_train in self.X_train_weighted.values]
+        distances = np.array([self.distance_function(x, x_train) for x_train in self.X_train_weighted.values])
 
         # Get the indices of the k-nearest neighbors
         sorted_indices  = np.argsort(distances)
@@ -190,25 +194,16 @@ class KNN:
 class Distances:
     @staticmethod
     def minkowski2(a, b):
-        a = np.asarray(a,dtype=np.float64)
-        b = np.asarray(b,dtype=np.float64)
-
         return np.sqrt(np.sum(np.power(np.abs(a - b),2)))
 
 
     @staticmethod
     def minkowski1(a, b):
-        a = np.asarray(a,dtype=np.float64)
-        b = np.asarray(b,dtype=np.float64)
-
         return np.sum(np.abs(a - b))
 
 
     @staticmethod
     def minkowski(a, b, p):
-        a = np.asarray(a,dtype=np.float64)
-        b = np.asarray(b,dtype=np.float64)
-
         return np.power(np.sum(np.power(np.abs(a - b),p)), (1 / p))
 
     @staticmethod

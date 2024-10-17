@@ -33,7 +33,8 @@ def main():
 
     for ds in datasets:
         print(f"Executing dataset {ds}")
-        for X_train, X_test, y_train, y_test in load_ds(ds): # Loads csv
-           callKNNs(X_train, X_test, y_train, y_test)
+        for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(ds)): # Loads csv
+            print(f"Fold {i}")
+            callKNNs(X_train, X_test, y_train, y_test, ds, i)
 
 main()
