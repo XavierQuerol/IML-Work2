@@ -45,6 +45,9 @@ def preprocess_sick():
 
         df_sick_train, df_sick_test = min_max_scaler(df_sick_train, df_sick_test, columns_with_nans)
 
+        df_sick_train = df_sick_train[[col for col in df_sick_train if col != 'sick'] + ['sick']]
+        df_sick_test = df_sick_test[[col for col in df_sick_test if col != 'sick'] + ['sick']]
+
         df_sick_train.to_csv(f'sick_csv/sick.fold.00000{fold}.train.csv', index=False)
         df_sick_test.to_csv(f'sick_csv/sick.fold.00000{fold}.test.csv', index=False)
 

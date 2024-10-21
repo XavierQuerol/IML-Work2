@@ -30,7 +30,7 @@ def preprocess():
 
 def main():
     print("MAIN")
-    datasets = ['sick', 'grid']
+    datasets = ['sick']#['grid', 'sick']
 
     for ds in datasets:
         print(f"Executing dataset {ds}")

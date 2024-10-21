@@ -93,7 +93,7 @@ def fill_nans(df_train, df_test, columns_predict):
         df_train_model = df_train.dropna(subset=[col])
         df_train_nans = df_train[df_train[col].isna()]
         df_test_model = df_test.dropna(subset=[col])
-        df_test_nans = df_test[df_train[col].isna()]
+        df_test_nans = df_test[df_test[col].isna()]
         x = pd.concat((df_train_model[columns_train], df_test_model[columns_train]))
         y = pd.concat((df_train_model[col], df_test_model[col]))
 
@@ -117,10 +117,10 @@ def computeMetrics(y_test, y_pred):
 
 def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
     distance_functions = ['minkowski1','minkowski2','HEOM']
-    voting_schemes = ['Majority_class','Inverse_Distance_Weights','Sheppards_Work']
+    voting_schemes = ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work']
     weight_schemes = ['Mutual_classifier','Relief','ANOVA']
-    ks = [3]#[1,3,5,7]
-    results = pd.DataFrame(columns=['Distance', 'Voting scheme', 'Weight scheme', 'Accuracy', 'Precision', 'Recall', 'F1', 'Solving Time'])
+    ks = [1,3,5,7]
+    results = pd.DataFrame(columns=['K','Distance', 'Voting scheme', 'Weight scheme', 'Accuracy', 'Precision', 'Recall', 'F1', 'Solving Time'])
 
     for dist_func in distance_functions:
         for voting_scheme in voting_schemes:
@@ -133,7 +133,7 @@ def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
                     y_pred = knn.predict(X_test)
                     solving_time = time.time() - start
                     accuracy, precision, recall, f1 = computeMetrics(y_test, y_pred)
-                    res = {'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time}
+                    res = {'K': k, 'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Precision': precision,'Recall': recall, 'F1': f1,'Solving Time': solving_time}
                     new_row = pd.DataFrame([res])
 
                     results = pd.concat([results.astype(new_row.dtypes), new_row.astype(results.dtypes)], ignore_index=True)
@@ -268,7 +268,9 @@ class Voting_schemes:
         for i, cls in enumerate(unique_classes):
             d = distances[classes == cls]
 
-            inverse_d = np.where(d != 0, 1 / d, 0)
+            if np.any(d == 0):
+                return cls
+            inverse_d = 1 / d
             metric[i] = np.sum(inverse_d)
 
 
@@ -340,6 +342,8 @@ class Weighting:
 
         relief = Relief()
 
+        relief.fit(X_train_np, y_train_np)
+
         X_train_weighted = relief.transform(X_train_np)
         X_test_weighted = relief.transform(X_test_np)
         X_train_weighted = pd.DataFrame(X_train_weighted)
@@ -350,7 +354,9 @@ class Weighting:
     # Only works with numeric data
     # Ranks features by how much they distinguish between the target classes based on variance between groups
     @staticmethod
-    def update_weights_anova(X_train, y_train, X_test=None, k=10):
+    def update_weights_anova(X_train, y_train, X_test=None):
+
+        k = len(X_train.columns) // 2
 
         selector = SelectKBest(score_func=f_classif, k=k)
         selector.fit(X_train, y_train)
