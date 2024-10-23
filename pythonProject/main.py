@@ -1,7 +1,8 @@
-#from preprocessing import preprocess, Load_Sick, Load_Grid
-from utils import callKNNs
-from preprocessing import preprocess_sick, preprocess_grid
 import pandas as pd
+
+from knn import callKNNs
+from svm import callSVMs
+from preprocessing import preprocess_sick, preprocess_grid
 
 def load_ds(name, num_folds=10):
 
@@ -30,13 +31,17 @@ def preprocess():
 
 def main():
     print("MAIN")
-    datasets = ['sick']#['grid', 'sick']
+    datasets = ['sick', 'grid']
+    model = 'svm' #'knn'
 
     for ds in datasets:
         print(f"Executing dataset {ds}")
         for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(ds)): # Loads csv
             print(f"Fold {i}")
-            callKNNs(X_train, X_test, y_train, y_test, ds, i)
+            if model == 'knn':
+                callKNNs(X_train, X_test, y_train, y_test, ds, i)
+            elif model == 'svm':
+                callSVMs(X_train, X_test, y_train, y_test, ds, i)
 
 if __name__ == "__main__":
     main()
