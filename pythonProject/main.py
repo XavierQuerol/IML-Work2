@@ -31,9 +31,9 @@ def preprocess():
 
 def main():
     print("MAIN")
-    datasets = ['sick', 'grid']
-    model = 'svm' #'knn'
-
+    datasets = ['grid']#['sick', 'grid']
+    model =  'knn' #'svm'
+    incremental = True 
     for ds in datasets:
         print(f"Executing dataset {ds}")
         for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(ds)): # Loads csv

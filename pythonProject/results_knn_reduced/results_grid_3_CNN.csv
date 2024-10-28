@@ -1,0 +1,2 @@
+K,Distance,Voting scheme,Weight scheme,Solving Time,Accuracy,Num samples,Precision_Class_0,Recall_Class_0,F1_Class_0,Precision_Class_1,Recall_Class_1,F1_Class_1
+7,minkowski2,Majority_class,Mutual_classifier,0.37604665756225586,0.6878306878306878,144,0.7160493827160493,0.6170212765957447,0.6628571428571428,0.6666666666666666,0.7578947368421053,0.7093596059113301

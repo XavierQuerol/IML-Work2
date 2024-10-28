@@ -12,14 +12,6 @@ def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
     voting_schemes = ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work']
     weight_schemes = ['Mutual_classifier','Relief','ANOVA']
     ks = [1,3,5,7]
-    columns=['K','Distance', 'Voting scheme', 'Weight scheme', 'Solving Time', 'Accuracy']
-    classes = y_train.unique()
-
-    for i in classes:
-        columns.append(f'Precision_Class_{i}')
-        columns.append(f'Recall_Class_{i}')
-        columns.append(f'F1_Class_{i}')
-    results = pd.DataFrame(columns=columns)
 
     for dist_func in distance_functions:
         for voting_scheme in voting_schemes:
@@ -45,6 +37,37 @@ def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
                     print(f"This combination took {solving_time} seconds")
 
     results.to_csv(f'results_knn/results_{ds_name}_{fold}.csv', index=False)
+
+
+def callKNN(X_train, X_test, y_train, y_test, dist_func, voting_scheme, weight_scheme, k):
+
+    columns=['K','Distance', 'Voting scheme', 'Weight scheme', 'Solving Time', 'Accuracy', 'Num samples']
+    classes = y_train.unique()
+
+    for i in classes:
+        columns.append(f'Precision_Class_{i}')
+        columns.append(f'Recall_Class_{i}')
+        columns.append(f'F1_Class_{i}')
+    results = pd.DataFrame(columns=columns)
+
+    start = time.time()
+    knn = KNN(dist_func, voting_scheme, weight_scheme,k)
+    knn.fit(X_train, y_train)
+    y_pred = knn.predict(X_test)
+    solving_time = time.time() - start
+    accuracy, precision, recall, f1 = computeMetrics(y_test, y_pred)
+    res = {'K': k, 'Distance': dist_func, 'Voting scheme': voting_scheme, 'Weight scheme': weight_scheme, 'Accuracy': accuracy,'Solving Time': solving_time, 'Num samples': len(X_train)}
+    for i, (p, r, f) in enumerate(zip(precision, recall, f1)):
+        res[f'Precision_Class_{i}'] = p
+        res[f'Recall_Class_{i}'] = r
+        res[f'F1_Class_{i}'] = f
+
+    new_row = pd.DataFrame([res])
+
+    results = pd.concat([results.astype(new_row.dtypes), new_row.astype(results.dtypes)], ignore_index=True)
+
+    return results
+
 
 # KNN
 
