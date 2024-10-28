@@ -122,100 +122,89 @@ class EENTh:
     
 
 class DROP:
-    def __init__(self, sort_type='sort1', k=3):
-        """
-        Initialize with data and labels
-        X: Training data (numpy array)
-        y: Training labels (numpy array)
-        k: Number of nearest neighbors
-        """
-        
+    def __init__(self, drop_type='drop1', k=3):
         self.k = k
-        self.sort_type = sort_type
-        
+        self.drop_type = drop_type
+
     def find_neighbors(self, instance_idx, exclude_idx=None):
-        """Find k+1 nearest neighbors of a given instance in X, optionally excluding one instance."""
         distances, indices = self.nbrs.kneighbors([self.X[instance_idx]])
-        neighbors = indices[0][1:]  # Exclude the instance itself
+        neighbors = indices[0][1:]  # Excluir la instancia misma
         if exclude_idx is not None:
             neighbors = [i for i in neighbors if i != exclude_idx]
         return neighbors
 
     def classify_without(self, idx, exclude_idx):
-        """Predict the label of instance `idx` excluding instance `exclude_idx`."""
         distances, indices = self.nbrs.kneighbors([self.X[idx]])
         filtered_indices = [i for i in indices[0] if i != exclude_idx][:self.k]
         return np.argmax(np.bincount(self.y[filtered_indices]))
-    
+
     def fit(self, X, y):
         self.X = X
         self.y = y.astype(int)
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(X,y)
-
         self.original_indices = list(range(len(X)))
-        
-        S = list(range(len(self.X)))  # Initialize S to include all instances
 
-        if self.sort_type == 'sort3':
+        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(X,y)
+        
+        # Inicializar S con todos los índices
+        S = list(range(len(self.X)))
+        
+        # Filtro de ruido si es DROP3
+        if self.drop_type == 'drop3':
             S = self.noise_filtering_pass(S)
 
-        if self.sort_type == 'sort2' or self.sort_type == 'sort3':
-
-            # Step 2: Create a distance list to the nearest enemy for sorting
+        # Crear una lista de distancias a los enemigos más cercanos
+        if self.drop_type in ['drop2', 'drop3']:
             distances_to_enemies = {
-                i: np.min([self.X[i] - self.X[j] for j in S if self.y[i] != self.y[j]])
+                i: np.min([np.linalg.norm(self.X[i] - self.X[j]) for j in S if self.y[i] != self.y[j]])
                 for i in S
             }
-            
-            # Sort instances in S by the distance to their nearest enemy
             S = sorted(S, key=lambda x: distances_to_enemies[x])
+
+        # Diccionario para los asociados
+        associates = {i: set() for i in S}
         
-        associates = {i: set() for i in S}  # Dictionary to track associates of each instance
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S],self.y[S])
-        # Step 1: Build associates list for each instance in S
+        # Ajustar el clasificador para el conjunto S inicial
+        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
+
+        # Crear la lista de asociados inicial
         for p in S:
             neighbors = self.find_neighbors(p)
             for n in neighbors:
-                if n in associates:  # Only add if n already exists in associates
-                    associates[n].add(p)  # Add p to each of its neighbors’ lists of associates
+                if n in associates:
+                    associates[n].add(p)
                 else:
-                    associates[n] = {p}  # Initialize a new set for n if not present
+                    associates[n] = {p}
 
-        # Step 3: Evaluate each instance in the sorted order
-        for p in S[:]:
+        # Evaluar cada instancia en el orden de S
+        for p in S[:]:  # Copia de S para no modificarlo durante la iteración
             with_correct = sum(1 for a in associates[p] if self.classify_without(a, None) == self.y[a])
-            # Check associates in the original set T instead of S
             without_correct = sum(1 for a in self.original_indices if a in associates[p] and self.classify_without(a, p) == self.y[a])
 
-            # Remove P if the classification accuracy does not degrade
+            # Remover P si la precisión de clasificación no se degrada
             if without_correct >= with_correct:
-                S.remove(p)  # Remove p from S
+                S.remove(p)
+                
+                # Ajustar el clasificador con el nuevo S
+                self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
 
-                # Update the associates lists and neighbors for each associate of P
-                for a in list(associates[p]):  # Use a copy of associates[p] to avoid modifying during iteration
+                # Actualizar la lista de vecinos y asociados
+                for a in list(associates[p]):
                     if p in associates[a]:
-                        associates[a].remove(p)  # Remove P from A’s list of nearest neighbors
-                        new_neighbors = self.find_neighbors(a, exclude_idx=p)  # Find new nearest neighbors
+                        associates[a].remove(p)
+                        new_neighbors = self.find_neighbors(a, exclude_idx=p)
                         for new_neighbor in new_neighbors:
-                            associates[new_neighbor].add(a)  # Add A to its new neighbor’s list of associates
-
-                # Clean up associates of P itself
+                            associates[new_neighbor].add(a)
                 associates[p].clear()
 
-        # Refit KNeighborsClassifier with the reduced set S once at the end
+        # Ajustar el clasificador final con el conjunto reducido S
         self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
-
-        # Return X and y subsets based on reduced set S
         X_prototypes = self.X[S]
         y_prototypes = self.y[S]
         return X_prototypes, y_prototypes
-    
+
     def noise_filtering_pass(self, S):
-        """Remove noisy instances from S using a rule similar to ENN."""
-        for p in S[:]:  # Use a copy of S to avoid modifying it during iteration
-            # Count the number of neighbors that classify the instance correctly
+        for p in S[:]:
             if self.classify_without(p, None) != self.y[p]:
-                # If misclassified, remove it from S
                 S.remove(p)
         return S
     

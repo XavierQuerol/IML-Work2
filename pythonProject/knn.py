@@ -8,6 +8,16 @@ from sklearn_relief import Relief
 from utils import computeMetrics
 
 def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
+
+    columns=['K','Distance', 'Voting scheme', 'Weight scheme', 'Solving Time', 'Accuracy']
+    classes = y_train.unique()
+
+    for i in classes:
+        columns.append(f'Precision_Class_{i}')
+        columns.append(f'Recall_Class_{i}')
+        columns.append(f'F1_Class_{i}')
+
+    results = pd.DataFrame(columns=columns)
     distance_functions = ['minkowski1','minkowski2','HEOM']
     voting_schemes = ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work']
     weight_schemes = ['Mutual_classifier','Relief','ANOVA']
