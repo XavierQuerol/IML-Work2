@@ -3,10 +3,8 @@ import sys
 
 import pandas as pd
 
-from knn import callKNNs
-from pythonProject.code.knn import callKNN
-from pythonProject.code.svm import callSVM
-from svm import callSVMs
+from knn import callKNN, callKNNs
+from svm import callSVM, callSVMs
 from preprocessing import preprocess_sick, preprocess_grid
 
 
