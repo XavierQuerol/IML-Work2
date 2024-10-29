@@ -5,6 +5,7 @@ import pandas as pd
 
 from knn import callKNNs
 from pythonProject.code.knn import callKNN
+from pythonProject.code.svm import callSVM
 from svm import callSVMs
 from preprocessing import preprocess_sick, preprocess_grid
 
@@ -72,30 +73,52 @@ def runAllKNN():
             elif model == 'svm':
                 callSVMs(X_train, X_test, y_train, y_test, ds, i)
 
-def main():
-    print(2 in [1,2,3])
+def startProgram():
     print("Welcome to our KNN and SVM application.")
 
     dataset = get_user_choice("Please, select the dataset you would like to use:", ["sick", "grid"])
-    alg = 'knn'#get_user_choice("Please, select the algorithm to use:", ["knn", "svm"])
+    alg = get_user_choice("Please, select the algorithm to use:", ["knn", "svm"])
 
     if alg == 'svm':
-        pass
-    elif alg == 'knn':
-        k = 1#get_user_choice("Please, select which K to use:", [1,3,5,7], True)
-        dist_func = 'minkowski1'#get_user_choice("Please, select a distance function to use:", ['minkowski1','minkowski2','HEOM'])
-        voting_scheme = 'Majority_class'#get_user_choice("Please, select a voting scheme to use :", ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work'])
-        weight_scheme = 'Mutual_classifier'#get_user_choice("Please, select a weight scheme to use:", ['Mutual_classifier','Relief','ANOVA'])
+        kernel = get_user_choice("Please, select the kernel to use:", ['rbf', 'sigmoid'])
 
-        print("Computing the KNN with the specified parameters:")
+        print("Computing the SVM with the specified parameters:")
         results = pd.DataFrame()
         for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(dataset)):
-            res = callKNN(X_train, X_test, y_train, y_test, dist_func, voting_scheme, weight_scheme, k)
+            res = callSVM(X_train, X_test, y_train, y_test, kernel)
             results = pd.concat([results, res], ignore_index=True)
             loading_bar(i+1, 10)
 
         print("\nComputation complete!")
         print(results.iloc[:, -9:].mean())
+
+    elif alg == 'knn':
+        k = get_user_choice("Please, select which K to use:", [1,3,5,7], True)
+        dist_func = get_user_choice("Please, select a distance function to use:", ['minkowski1','minkowski2','HEOM'])
+        voting_scheme = get_user_choice("Please, select a voting scheme to use :", ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work'])
+        weight_scheme = get_user_choice("Please, select a weight scheme to use:", ['Mutual_classifier','Relief','ANOVA'])
+
+        print(f"{k} - {dist_func} - {voting_scheme} - {weight_scheme}")
+        print("Computing the KNN with the specified parameters:")
+        results = pd.DataFrame()
+        for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(dataset)):
+            res = callKNN(X_train, X_test, y_train, y_test, dist_func, voting_scheme, weight_scheme, int(k))
+            results = pd.concat([results, res], ignore_index=True)
+            loading_bar(i+1, 10)
+
+        print("\nComputation complete!")
+        print(results.iloc[:, -9:].mean())
+
+def main():
+    ans = "y"
+    while ans.lower() == "y":
+        startProgram()
+        ans = input("Do you want to do another test? (y/n)")
+
+        while ans != "y" and ans != "n":
+            print("Invalid choice. Try again.")
+            ans = input("Do you want to do another test? (y/n)")
+
 
 if __name__ == "__main__":
     main()
