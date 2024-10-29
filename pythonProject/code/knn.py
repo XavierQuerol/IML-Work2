@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import time
@@ -46,7 +48,8 @@ def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
 
                     print(f"This combination took {solving_time} seconds")
 
-    results.to_csv(f'results_knn/results_{ds_name}_{fold}.csv', index=False)
+    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results_knn")
+    results.to_csv(os.path.join(base_dir, f'results_{ds_name}_{fold}.csv'), index=False)
 
 
 def callKNN(X_train, X_test, y_train, y_test, dist_func, voting_scheme, weight_scheme, k):

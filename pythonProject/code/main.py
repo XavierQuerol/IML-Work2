@@ -1,8 +1,37 @@
+import os
+import sys
+
 import pandas as pd
 
 from knn import callKNNs
+from pythonProject.code.knn import callKNN
 from svm import callSVMs
 from preprocessing import preprocess_sick, preprocess_grid
+
+
+def get_user_choice(prompt, options, is_numeric = False):
+    while True:
+        print(prompt)
+        for i, option in enumerate(options, 1):
+            if is_numeric:
+                print(f"  {option}")
+            else:
+                print(f" {i}. {option}")
+        choice = input("Please enter the number of your choice: ")
+
+        if choice in options or (is_numeric and int(choice) in options):
+            return choice
+        if not is_numeric and choice.isdigit() and 1 <= int(choice) <= len(options):
+            return options[int(choice) - 1]
+        else:
+            print("Invalid choice. Try again.\n")
+
+def loading_bar(iteration, total, length=40):
+    percent = (iteration / total)
+    bar_length = int(length * percent)
+    bar = '#' * bar_length + '-' * (length - bar_length)
+    sys.stdout.write(f'\r[{bar}] {percent:.2%} Complete')
+    sys.stdout.flush()
 
 def load_ds(name, num_folds=10):
 
@@ -10,8 +39,9 @@ def load_ds(name, num_folds=10):
 
     for fold in range(num_folds):
 
-        train_file = f'{name}_csv/{name}.fold.00000{fold}.train.csv'
-        test_file = f'{name}_csv/{name}.fold.00000{fold}.test.csv'
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", f"{name}_csv")
+        train_file = os.path.join(base_dir, f'{name}.fold.00000{fold}.train.csv')
+        test_file = os.path.join(base_dir, f'{name}.fold.00000{fold}.test.csv')
 
         df_train = pd.read_csv(train_file)
         df_test = pd.read_csv(test_file)
@@ -29,19 +59,43 @@ def preprocess():
     preprocess_sick()
     preprocess_grid() # Loads tiff and saves as csv
 
-def main():
-    print("MAIN")
-    datasets = ['sick']#['sick', 'grid']
-    model =  'knn' #'svm'
+def runAllKNN():
+    datasets = ['sick']  # ['sick', 'grid']
+    model = 'knn'# 'svm'
 
     for ds in datasets:
         print(f"Executing dataset {ds}")
-        for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(ds)): # Loads csv
+        for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(ds)):  # Loads csv
             print(f"Fold {i}")
             if model == 'knn':
                 callKNNs(X_train, X_test, y_train, y_test, ds, i)
             elif model == 'svm':
                 callSVMs(X_train, X_test, y_train, y_test, ds, i)
+
+def main():
+    print(2 in [1,2,3])
+    print("Welcome to our KNN and SVM application.")
+
+    dataset = get_user_choice("Please, select the dataset you would like to use:", ["sick", "grid"])
+    alg = 'knn'#get_user_choice("Please, select the algorithm to use:", ["knn", "svm"])
+
+    if alg == 'svm':
+        pass
+    elif alg == 'knn':
+        k = 1#get_user_choice("Please, select which K to use:", [1,3,5,7], True)
+        dist_func = 'minkowski1'#get_user_choice("Please, select a distance function to use:", ['minkowski1','minkowski2','HEOM'])
+        voting_scheme = 'Majority_class'#get_user_choice("Please, select a voting scheme to use :", ['Majority_class','Inverse_Distance_Weights', 'Sheppards_Work'])
+        weight_scheme = 'Mutual_classifier'#get_user_choice("Please, select a weight scheme to use:", ['Mutual_classifier','Relief','ANOVA'])
+
+        print("Computing the KNN with the specified parameters:")
+        results = pd.DataFrame()
+        for i, (X_train, X_test, y_train, y_test) in enumerate(load_ds(dataset)):
+            res = callKNN(X_train, X_test, y_train, y_test, dist_func, voting_scheme, weight_scheme, k)
+            results = pd.concat([results, res], ignore_index=True)
+            loading_bar(i+1, 10)
+
+        print("\nComputation complete!")
+        print(results.iloc[:, -9:].mean())
 
 if __name__ == "__main__":
     main()
