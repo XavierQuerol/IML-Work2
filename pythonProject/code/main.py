@@ -117,7 +117,7 @@ def preprocess():
     preprocess_grid() # Loads tiff and saves as csv
 
 def runAllKNN():
-    datasets = ['sick']  # ['sick', 'grid']
+    datasets = ['sick', 'grid']
     model = 'knn'# 'svm'
 
     for ds in datasets:
