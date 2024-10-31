@@ -62,26 +62,54 @@ def store_ds(name, fold, method, X_train, y_train):
 
 def reduce_instances(ds, i, X_train, y_train, method):
 
-    if method=="CNN_GCNN":
+    if method=="CNN":
         cnn = CNN_GCNN(rho=0)
         prototypes_X, prototypes_y = cnn.fit(X_train.values, y_train.values)
         X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
         y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
-        store_ds(ds, i, 'CNN', X_train, y_train)
+        #store_ds(ds, i, 'CNN', X_train, y_train)
+        return X_train, y_train
+    elif method=="GCNN":
+        cnn = CNN_GCNN(rho=0.5)
+        prototypes_X, prototypes_y = cnn.fit(X_train.values, y_train.values)
+        X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
+        y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
+        #store_ds(ds, i, 'GCNN', X_train, y_train)
+        return X_train, y_train
+    elif method=="EEN":
+        eenth = EENTh(k=3, threshold=None)
+        prototypes_X, prototypes_y = eenth.fit(X_train.values, y_train.values)
+        X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
+        y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
+        #store_ds(ds, i, 'EEN', X_train, y_train)
         return X_train, y_train
     elif method=="EENTh":
         eenth = EENTh(k=3, threshold=0.99)
         prototypes_X, prototypes_y = eenth.fit(X_train.values, y_train.values)
         X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
         y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
-        store_ds(ds, i, 'EENTh', X_train, y_train)
+        #store_ds(ds, i, 'EENTh', X_train, y_train)
+        return X_train, y_train
+    elif method=="DROP1":
+        drop = DROP(drop_type='drop1', k=7)
+        prototypes_X, prototypes_y = drop.fit(X_train.values, y_train.values)
+        X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
+        y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
+        #store_ds(ds, i, 'DROP1', X_train, y_train)
+        return X_train, y_train
+    elif method=="DROP2":
+        drop = DROP(drop_type='drop2', k=7)
+        prototypes_X, prototypes_y = drop.fit(X_train.values, y_train.values)
+        X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
+        y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
+        #store_ds(ds, i, 'DROP2', X_train, y_train)
         return X_train, y_train
     elif method=="DROP3":
         drop = DROP(drop_type='drop3', k=7)
         prototypes_X, prototypes_y = drop.fit(X_train.values, y_train.values)
         X_train = pd.DataFrame(prototypes_X, columns = X_train.columns)
         y_train = pd.Series(prototypes_y, name = y_train.name, dtype=int)
-        store_ds(ds, i, 'DROP3', X_train, y_train)
+        #store_ds(ds, i, 'DROP3', X_train, y_train)
         return X_train, y_train
 
 def preprocess():
@@ -107,7 +135,7 @@ def startProgram():
     dataset = get_user_choice("Please, select the dataset you would like to use:", ["sick", "grid"])
     alg = get_user_choice("Please, select the algorithm to use:", ["knn", "svm"])
 
-    instance_reduction = get_user_choice("Do you want to apply an instance reduction technique?:", ["No", "CNN_GCNN", "EENTh", "DROP3"])
+    instance_reduction = get_user_choice("Do you want to apply an instance reduction technique?:", ["No", "CNN", "GCNN", "EEN", "EENTh", "DROP1", "DROP2", "DROP3"])
 
     if alg == 'svm':
         kernel = get_user_choice("Please, select the kernel to use:", ['rbf', 'sigmoid'])
