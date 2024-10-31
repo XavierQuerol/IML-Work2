@@ -2,7 +2,7 @@ Steps to run the script:
 
 ### Team
 - Aina Llaneras
-- Maria Angelica James
+- Maria Angelica Jaimes
 - Xavier Querol 
 - Bernat Comas
 
