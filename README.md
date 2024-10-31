@@ -9,6 +9,28 @@ Steps to run the script:
 
 ### Running script for the first time
 
+1. Open folder in terminal
+```bash
+cd <root_folder_of_project>/
+```
+2. Create virtual env
+```bash
+python3 -m venv venv/
+```
+3. Open virtual env
+```bash
+source venv/bin/activate
+```
+4. Install required dependencies
+```bash
+pip install -r requirements.txt
+```
+you can check if dependencies were installed by running next
+command,it should print list with installed dependencies
+```bash
+pip list
+```
+
 Execute main.py by running:
 ```bash
  python3 main.py
