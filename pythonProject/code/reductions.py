@@ -84,16 +84,31 @@ class CNN_GCNN:
         d_heterogeneous = np.linalg.norm(x - nearest_heterogeneous)
         return d_homogeneous < d_heterogeneous - self.rho * delta_n
 
+import numpy as np
+from collections import Counter
+
 class EENTh:
     def __init__(self, k=3, threshold=None):
         self.k = k
         self.threshold = threshold
 
+    def _euclidean_distance(self, a, b):
+        return np.sqrt(np.sum((a - b) ** 2))
+
+    def _get_neighbors(self, X, y, sample):
+        distances = [self._euclidean_distance(sample, X[i]) for i in range(len(X))]
+        neighbors_idx = np.argsort(distances)[1:self.k+1]
+        return [(y[i], distances[i]) for i in neighbors_idx]
+
+    def _predict_proba(self, neighbors, y):
+        classes = np.unique(y)
+        counts = Counter([label for label, _ in neighbors])
+        probs = np.array([counts[cls] / self.k for cls in classes])
+        return probs
+
     def fit(self, X, y):
-        knn = KNeighborsClassifier(n_neighbors=self.k)
         S = np.copy(X)
         labels = np.copy(y)
-
         to_remove = []
 
         # Leave-one-out strategy
@@ -102,15 +117,14 @@ class EENTh:
             X_without_i = np.delete(X, i, axis=0)
             y_without_i = np.delete(y, i, axis=0)
 
-            # Train k-NN without the current sample
-            knn.fit(X_without_i, y_without_i)
+            # Find k nearest neighbors manually
+            neighbors = self._get_neighbors(X_without_i, y_without_i, X[i])
 
             # Predict class probabilities for the current sample
-            probs = knn.predict_proba([X[i]])[0]
+            probs = self._predict_proba(neighbors, y_without_i)
             y_pred = np.argmax(probs)
 
-
-            # Apply WilsonTh if threshold is given, otherwise Wilson's Editing
+            # Apply Wilson's Editing with threshold
             if y_pred != y[i] or (self.threshold is not None and np.max(probs) <= self.threshold):
                 to_remove.append(i)
 
@@ -119,149 +133,94 @@ class EENTh:
         labels = np.delete(labels, to_remove, axis=0)
 
         return S, labels
-    
 
+    
 class DROP:
     def __init__(self, drop_type='drop1', k=3):
         self.k = k
         self.drop_type = drop_type
 
-    def find_neighbors(self, instance_idx, exclude_idx=None):
-        distances, indices = self.nbrs.kneighbors([self.X[instance_idx]])
-        neighbors = indices[0][1:]  # Excluir la instancia misma
-        if exclude_idx is not None:
-            neighbors = [i for i in neighbors if i != exclude_idx]
-        return neighbors
-
-    def classify_without(self, idx, exclude_idx):
-        distances, indices = self.nbrs.kneighbors([self.X[idx]])
-        filtered_indices = [i for i in indices[0] if i != exclude_idx][:self.k]
+    def _classify_without(self, idx, exclude_idx):
+        filtered_indices = [i for i in self.neighbors[idx] if i != exclude_idx][:self.k]
         return np.argmax(np.bincount(self.y[filtered_indices]))
+    
+    def _euclidean_distance(self, a, b):
+        return np.sqrt(np.sum((a - b) ** 2))
+
+    def _get_neighbors(self, X, sample):
+        distances = [self._euclidean_distance(sample, X[i]) for i in range(len(X))]
+        neighbors_idx = np.argsort(distances)[1:self.k+2]
+        return neighbors_idx
 
     def fit(self, X, y):
         self.X = X
         self.y = y.astype(int)
-        self.original_indices = list(range(len(X)))
 
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(X,y)
+        # Initialize S with all indices
+        S = list(range(len(X)))
+
+        self.neighbors = {i: list(self._get_neighbors(X, X[i])) for i in S}
         
-        # Inicializar S con todos los índices
-        S = list(range(len(self.X)))
-        
-        # Filtro de ruido si es DROP3
+        # Noise filtering pass for DROP3
         if self.drop_type == 'drop3':
             S = self.noise_filtering_pass(S)
 
-        # Crear una lista de distancias a los enemigos más cercanos
+        # Create enemy distance list if using DROP2 or DROP3
         if self.drop_type in ['drop2', 'drop3']:
             distances_to_enemies = {
-                i: np.min([np.linalg.norm(self.X[i] - self.X[j]) for j in S if self.y[i] != self.y[j]])
+                i: np.min([np.linalg.norm(X[i] - X[j]) for j in S if y[i] != y[j]])
                 for i in S
             }
-            S = sorted(S, key=lambda x: distances_to_enemies[x])
+            S = sorted(S, key=lambda x: distances_to_enemies[x], reverse=True)
 
-        # Diccionario para los asociados
+        # Initialize associates for each instance in S
         associates = {i: set() for i in S}
-        
-        # Ajustar el clasificador para el conjunto S inicial
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
-
-        # Crear la lista de asociados inicial
-        for p in S:
-            neighbors = self.find_neighbors(p)
-            for n in neighbors:
+        for p, ns in self.neighbors.items():
+            for n in ns:
                 if n in associates:
                     associates[n].add(p)
-                else:
-                    associates[n] = {p}
 
-        # Evaluar cada instancia en el orden de S
-        for p in S[:]:  # Copia de S para no modificarlo durante la iteración
-            with_correct = sum(1 for a in associates[p] if self.classify_without(a, None) == self.y[a])
-            without_correct = sum(1 for a in self.original_indices if a in associates[p] and self.classify_without(a, p) == self.y[a])
+        # Evaluate each instance in the order of S
+        for p in S[:]:  # Iterate over a copy of S to avoid modification during iteration
 
-            # Remover P si la precisión de clasificación no se degrada
+            with_correct = sum(1 for a in associates[p] if self._classify_without(a, None) == self.y[a])
+            without_correct = sum(1 for a in associates[p] if self._classify_without(a, p) == self.y[a])
+
+            # Remove P if classification accuracy does not degrade
             if without_correct >= with_correct:
                 S.remove(p)
                 
-                # Ajustar el clasificador con el nuevo S
-                self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
-
-                # Actualizar la lista de vecinos y asociados
+                # Update neighbors and associates after removing p
                 for a in list(associates[p]):
-                    if p in associates[a]:
-                        associates[a].remove(p)
-                        new_neighbors = self.find_neighbors(a, exclude_idx=p)
-                        for new_neighbor in new_neighbors:
-                            associates[new_neighbor].add(a)
-                associates[p].clear()
 
-        # Ajustar el clasificador final con el conjunto reducido S
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
+                    self.neighbors[a].remove(p)
+                    # Get the original index of 'a'
+                    original_a_index = a
+                    
+                    # Get the subset of indices for S
+                    S_indices = np.array(S)  # Get the indices of the current subset
+                    S_data = self.X[S]  # Subset data using S indices
+                    distances = np.linalg.norm(S_data - self.X[original_a_index], axis=1)  # Calculate distance to all instances in X[S]
+                    sorted_indices = np.argsort(distances)  # Sort distances to get indices of neighbors
+
+                    new_neighbor = [S_indices[idx] for idx in sorted_indices if S_indices[idx] != original_a_index and S_indices[idx] != p and S_indices[idx] not in self.neighbors[a]]
+                    if new_neighbor:
+                        self.neighbors[a].append(new_neighbor[0])
+                        associates[new_neighbor[0]].add(a)
+                
+                if self.drop_type == 'drop1':
+                    for neighbor in self.neighbors[p]:
+                        if p in associates[neighbor]:
+                            associates[neighbor].remove(p)
+                    
+                    associates[p].clear()
+
         X_prototypes = self.X[S]
         y_prototypes = self.y[S]
         return X_prototypes, y_prototypes
 
     def noise_filtering_pass(self, S):
         for p in S[:]:
-            if self.classify_without(p, None) != self.y[p]:
+            if self._classify_without(p, None) != self.y[p]:
                 S.remove(p)
         return S
-    
-    def drop3(self):
-        """Perform DROP3 algorithm for instance reduction and return prototypes."""
-        S = list(range(len(self.X)))  # Initialize S to include all instances
-
-        # Step 1: Noise filtering pass
-        S = self.noise_filtering_pass(S)
-
-        # Step 2: Create a distance list to the nearest enemy for sorting
-        distances_to_enemies = {
-            i: np.min([np.linalg.norm(self.X[i] - self.X[j]) for j in S if self.y[i] != self.y[j]])
-            for i in S
-        }
-        
-        # Sort instances in S by the distance to their nearest enemy
-        sorted_S = sorted(S, key=lambda x: distances_to_enemies[x])
-
-        # Step 3: Evaluate each instance in the sorted order
-        associates = {i: set() for i in S}  # Dictionary to track associates of each instance
-        
-        # Build associates list for each instance in S
-        
-
-        for p in S:
-            neighbors = self.find_neighbors(p)
-            for n in neighbors:
-                if n in associates:  # Only add if n already exists in associates
-                    associates[n].add(p)  # Add p to each of its neighbors’ lists of associates
-                else:
-                    associates[n] = {p}  # Initialize a new set for n if not present
-
-        for p in sorted_S:
-            with_correct = sum(1 for a in associates[p] if self.classify_without(a, None) == self.y[a])
-            # Check associates in the original set T instead of S
-            without_correct = sum(1 for a in self.original_indices if a in associates[p] and self.classify_without(a, p) == self.y[a])
-
-            # Remove P if the classification accuracy does not degrade
-            if without_correct >= with_correct:
-                S.remove(p)  # Remove p from S
-
-                # Update the associates lists and neighbors for each associate of P
-                for a in list(associates[p]):  # Use a copy of associates[p] to avoid modifying during iteration
-                    if p in associates[a]:
-                        associates[a].remove(p)  # Remove P from A’s list of nearest neighbors
-                        new_neighbors = self.find_neighbors(a, exclude_idx=p)  # Find new nearest neighbors
-                        for new_neighbor in new_neighbors:
-                            associates[new_neighbor].add(a)  # Add A to its new neighbor’s list of associates
-
-                # Clean up associates of P itself
-                associates[p].clear()
-
-        # Refit NearestNeighbors with the reduced set S once at the end
-        self.nbrs = KNeighborsClassifier(n_neighbors=self.k + 1).fit(self.X[S], self.y[S])
-
-        # Return X and y subsets based on reduced set S
-        X_prototypes = self.X[S]
-        y_prototypes = self.y[S]
-        return X_prototypes, y_prototypes

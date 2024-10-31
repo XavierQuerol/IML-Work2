@@ -1,0 +1,2 @@
+Kernel,Accuracy,Solving Time,Num samples,Precision_Class_0,Recall_Class_0,F1_Class_0,Precision_Class_1,Recall_Class_1,F1_Class_1
+rbf,0.9682539682539683,0.06724309921264648,2913,0.9708222811671088,0.997275204359673,0.9838709677419355,0.0,0.0,0.0

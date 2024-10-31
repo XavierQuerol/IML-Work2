@@ -7,7 +7,7 @@ import time
 from sklearn.feature_selection import mutual_info_classif, f_classif, SelectKBest
 from sklearn_relief import Relief
 
-from utils import computeMetrics
+from code.utils import computeMetrics
 
 def callKNNs(X_train, X_test, y_train, y_test, ds_name, fold):
 
