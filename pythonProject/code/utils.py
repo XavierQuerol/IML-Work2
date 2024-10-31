@@ -107,8 +107,8 @@ def fill_nans(df_train, df_test, columns_predict):
 
 def computeMetrics(y_test, y_pred):
     accuracy = accuracy_score(y_test, y_pred)
-    precision_per_class = precision_score(y_test, y_pred, average=None)
-    recall_per_class = recall_score(y_test, y_pred, average=None)
-    f1_per_class = f1_score(y_test, y_pred, average=None)
+    precision_per_class = precision_score(y_test, y_pred, average=None,zero_division=0)
+    recall_per_class = recall_score(y_test, y_pred, average=None,zero_division=0)
+    f1_per_class = f1_score(y_test, y_pred, average=None,zero_division=0)
 
     return accuracy, precision_per_class, recall_per_class, f1_per_class
