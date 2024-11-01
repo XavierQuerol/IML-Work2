@@ -3,6 +3,8 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from scipy import stats
+import scikit_posthocs as sp
 
 
 def read_csv(folder_path, dataset_name, reduction_mode):
@@ -135,17 +137,17 @@ def plot_test(data, metric, results=None, autorank=False):
     plt.show()
 
 
-def evaluation_test_autorank(data, metric, p_value=0.05):
+def evaluation_test_autorank(data, metric, p_value=0.05, plot=False):
     results = autorank(data, alpha = p_value, order = 'descending')
     try:
         create_report(results)
     except:
         pass
-
-    plot_test(data, metric, results=results, autorank=True)
+    if plot:
+        plot_test(data, metric, results=results, autorank=True)
 
             
-def evaluation_test(data, metric, p_value=0.05):
+def evaluation_test(data, metric, p_value=0.05, plot=False):
 
     metric_values = [list(model) for model in data.T.values]
 
@@ -174,13 +176,14 @@ def evaluation_test(data, metric, p_value=0.05):
     else:
         print("Not enough data to perform the test.")
         return
-    plot_test(data, metric, results=None, autorank=False)
+    if plot:
+        plot_test(data, metric, results=None, autorank=False)
 
 
-def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria'):
+def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria', plot=False):
 
     votings = {'Majority_class': 'Mj', 'Inverse_Distance_Weights': 'IDW','Sheppards_Work': 'SW'}
-    distances = {'minkowski1': 'm1', 'minkowski2': 'm2', 'HEOM': 'H',    }
+    distances = {'minkowski1': 'm1', 'minkowski2': 'm2', 'HEOM': 'H'}
     weighting = {'Mutual_classifier':'MC', 'Relief': 'R', 'ANOVA': 'A'}
 
     df_combined = read_csv(f'results_{method}', dataset_name, False)
@@ -202,16 +205,126 @@ def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria'
             data[f"{row['Kernel']}"] = el
             
     if type_evaluation == 'autorank':
-        evaluation_test_autorank(data, metric, 0.05)
+        evaluation_test_autorank(data, metric, 0.05, plot=plot)
     elif type_evaluation == 'our_criteria':
-        evaluation_test(data, metric, 0.05)
+        evaluation_test(data, metric, 0.05, plot=plot)
 
 
-def evaluate_all_models(type_evaluation='our_criteria'):
+def evaluate_all_models(type_evaluation='our_criteria', plot=False):
     dataset_names = ['grid','sick']
     methods = ['knn','svm']
     for dataset_name in dataset_names:
         for method in methods:
             for metric in ['Accuracy', 'Solving Time']:
                 print(f'Evaluating method {method} on dataset {dataset_name} and metric {metric}')
-                evaluate_model(dataset_name, method, metric, type_evaluation= type_evaluation)
+                evaluate_model(dataset_name, method, metric, type_evaluation= type_evaluation, plot=plot)
+
+def evaluation_t_test(data, metric, p_value, plot=False):
+    metric_values = [list(model) for model in data.T.values]
+
+    # Perform paired t-test
+    stat, p_value_ttest = stats.ttest_rel(metric_values[0], metric_values[1])
+    print(f"Paired t-test statistic: {stat}, p-value: {p_value}")
+
+    if p_value_ttest < p_value:
+        print("Significant difference found between the two models.")
+    else:
+        print("No significant differences found between the two models.")
+    if plot:
+        plot_test(data, metric, results=None, autorank=False)
+
+def calculate_statistics(data, metric):
+    """Calculate mean and std as formatted string 'mean ± std'."""
+    mean_val = data[metric].mean()
+    std_val = data[metric].std()
+    return f"{mean_val:.4f} ± {std_val:.4f}"
+
+def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, summary_statistics = None, plot = False):
+
+    best_params = {'grid': {'knn': {'K': 7, 'Distance': 'minkowski2', 'Voting scheme': 'Majority_class', 'Weight scheme': 'Mutual_classifier'},
+                            'svm': {'Kernel': 'rbf'}},
+                   'sick': {'knn': {'K': 7, 'Distance': 'HEOM', 'Voting scheme': 'Majority_class', 'Weight scheme': 'Mutual_classifier'},
+                            'svm': {'Kernel': 'rbf'}}}
+    
+    num_samples = {'grid': 1700, 'sick': 3395}
+    
+    # Load original data
+    results = read_csv(f'results_{method}', dataset_name, False)
+    # Filter original data based on best parameters
+    params = best_params[dataset_name][method]
+    for key, value in params.items():
+        results = results[results[key] == value]
+
+    results_reduced = read_csv(f'results_{method}_reduced', dataset_name, reduction_method)
+
+    data_accuracy = pd.DataFrame({
+        'Original': list(results['Accuracy']), 
+        'Reduced': list(results_reduced['Accuracy'])
+    })
+    data_solving_time = pd.DataFrame({
+        'Original': list(results['Solving Time']), 
+        'Reduced': list(results_reduced['Solving Time'])
+    })
+
+    if type_evaluation == 'our_criteria':
+        print('Evaluating Accuracy')
+        evaluation_t_test(data_accuracy, 'Accuracy', 0.05, plot=plot)
+        print('Evaluating Solving Time')
+        evaluation_t_test(data_solving_time, 'Solving Time', 0.05, plot=plot)
+    else:
+        print('Evaluating Accuracy')
+        evaluation_test_autorank(data_accuracy, 'Accuracy', 0.05, plot=plot)
+        print('Evaluating Solving Time')
+        evaluation_test_autorank(data_solving_time, 'Solving Time', 0.05, plot=plot)
+
+    if summary_statistics is not None:
+        # Calculate statistics for both metrics in the original data
+        original_accuracy = calculate_statistics(results, 'Accuracy')
+        original_solving_time = calculate_statistics(results, 'Solving Time')
+       # Add the original result row without reduction for both metrics
+        summary_statistics = pd.concat([
+            summary_statistics,
+            pd.DataFrame({
+                'Dataset': [dataset_name],
+                'Method': [method],
+                'Reduction': ['None'],
+                'Accuracy': [original_accuracy],
+                'Solving Time': [original_solving_time],
+                'Num Samples': [num_samples[dataset_name]]
+            })
+        ], ignore_index=True)
+
+        # Now load reduced data for this reduction method
+        
+        reduced_accuracy = calculate_statistics(results_reduced, 'Accuracy')
+        reduced_solving_time = calculate_statistics(results_reduced, 'Solving Time')
+        reduced_num_samples = calculate_statistics(results_reduced, 'Num samples')
+
+        # Add the reduced result row for both metrics
+        summary_statistics = pd.concat([
+            summary_statistics,
+            pd.DataFrame({
+                'Dataset': [dataset_name],
+                'Method': [method],
+                'Reduction': [reduction_method],
+                'Accuracy': [reduced_accuracy],
+                'Solving Time': [reduced_solving_time],
+                'Num Samples': [reduced_num_samples]
+            })
+        ], ignore_index=True)
+
+    if summary_statistics is not None:
+        return summary_statistics
+
+def evaluate_all_reductions(type_evaluation, plot=False):
+    dataset_names = ['grid','sick']
+    methods = ['knn','svm']
+    summary_statistics = pd.DataFrame()
+    for dataset_name in dataset_names:
+        for method in methods:
+            for i, reduction in enumerate(['CNN', 'DROP', 'EENTh']):
+                print(f'Evaluating method {method} on dataset {dataset_name} and reduction {reduction}')
+                summary_statistics = evaluate_reduction(dataset_name, method, reduction, type_evaluation=type_evaluation, summary_statistics=summary_statistics, plot=plot)
+
+    summary_statistics = summary_statistics.drop_duplicates()
+    return summary_statistics
