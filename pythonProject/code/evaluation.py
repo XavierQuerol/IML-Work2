@@ -236,6 +236,8 @@ def evaluation_t_test(data, metric, p_value, plot=False):
         print("No significant differences found between the two models.")
     if plot:
         plot_test(data, metric, results=None, autorank=False)
+    print(p_value_ttest)
+    return p_value_ttest
 
 def calculate_statistics(data, metric):
     """Calculate mean and std as formatted string 'mean ± std'."""
@@ -284,16 +286,19 @@ def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, 
 
     if type_evaluation == 'our_criteria':
         print('Evaluating Accuracy')
-        evaluation_t_test(data_accuracy, 'Accuracy', 0.05, plot=plot)
+        p_value_ttest_ac = evaluation_t_test(data_accuracy, 'Accuracy', 0.05, plot=plot)
         print('Evaluating Solving Time')
-        evaluation_t_test(data_solving_time, 'Solving Time', 0.05, plot=plot)
+        p_value_ttest_st = evaluation_t_test(data_solving_time, 'Solving Time', 0.05, plot=plot)
     else:
         print('Evaluating Accuracy')
         evaluation_test_autorank(data_accuracy, 'Accuracy', 0.05, plot=plot)
         print('Evaluating Solving Time')
         evaluation_test_autorank(data_solving_time, 'Solving Time', 0.05, plot=plot)
-
+    
     if summary_statistics is not None:
+        if not p_value_ttest_ac:
+            p_value_ttest_ac = None
+            p_value_ttest_st = None
         # Calculate statistics for both metrics in the original data
         original_accuracy = calculate_statistics(results, 'Accuracy')
         original_solving_time = calculate_statistics(results, 'Solving Time')
@@ -325,7 +330,9 @@ def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, 
                 'Reduction': [reduction_method],
                 'Accuracy': [reduced_accuracy],
                 'Solving Time': [reduced_solving_time],
-                'Num Samples': [reduced_num_samples]
+                'Num Samples': [reduced_num_samples],
+                'P-value Acc': [f"{p_value_ttest_ac:.4f}"],
+                'P-value ST': [f"{p_value_ttest_st:.4f}"]
             })
         ], ignore_index=True)
 
