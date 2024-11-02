@@ -3,7 +3,7 @@ import pandas as pd
 import time
 from sklearn.svm import SVC
 
-from utils import computeMetrics
+from code.utils import computeMetrics
 
 def callSVMs(X_train, X_test, y_train, y_test, ds_name, fold):
     kernels = ['rbf', 'sigmoid']

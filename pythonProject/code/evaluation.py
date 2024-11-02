@@ -138,7 +138,11 @@ def plot_test(data, metric, results=None, autorank=False):
 
 
 def evaluation_test_autorank(data, metric, p_value=0.05, plot=False):
-    results = autorank(data, alpha = p_value, order = 'descending')
+    if metric == 'Accuracy':
+        order = 'descending'
+    elif metric == 'Solving Time':
+        order = 'ascending'
+    results = autorank(data, alpha = p_value, order = order)
     try:
         create_report(results)
     except:
@@ -191,7 +195,7 @@ def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria'
     metrics_summary.to_csv(f'results_{method}/results_{dataset_name}_all.csv', index=False)
 
     if method == 'knn':
-        best_models = metrics_summary.iloc[[0, 1, 2, 3, 4, 90, 100]]
+        best_models = metrics_summary.iloc[[0, 1, 2, 3, 4, 5,6,7,8,9,10,11,12,90, 100]]
         metric_values = get_metrics_knn(best_models, df_combined, metric)
         data = pd.DataFrame()
         for el, (i,row) in zip(metric_values, best_models.iterrows()):
@@ -241,11 +245,23 @@ def calculate_statistics(data, metric):
 
 def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, summary_statistics = None, plot = False):
 
-    best_params = {'grid': {'knn': {'K': 7, 'Distance': 'minkowski2', 'Voting scheme': 'Majority_class', 'Weight scheme': 'Mutual_classifier'},
-                            'svm': {'Kernel': 'rbf'}},
-                   'sick': {'knn': {'K': 7, 'Distance': 'HEOM', 'Voting scheme': 'Majority_class', 'Weight scheme': 'Mutual_classifier'},
-                            'svm': {'Kernel': 'rbf'}}}
-    
+    best_params = {'grid': {
+                        'knn': {
+                            'K': 7,
+                            'Distance': 'HEOM',
+                            'Voting scheme': 'Inverse_Distance_Weights',
+                            'Weight scheme': 'Mutual_classifier'},
+                        'svm': 
+                            {'Kernel': 'rbf'}}, 
+                    'sick': {
+                        'knn':{
+                            'K': 7, 
+                            'Distance': 'minkowski1', 
+                            'Voting scheme': 'Majority_class', 
+                            'Weight scheme': 'ANOVA'},
+                        'svm': 
+                            {'Kernel': 'rbf'}}}
+        
     num_samples = {'grid': 1700, 'sick': 3395}
     
     # Load original data
