@@ -195,7 +195,7 @@ def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria'
     metrics_summary.to_csv(f'results_{method}/results_{dataset_name}_all.csv', index=False)
 
     if method == 'knn':
-        best_models = metrics_summary.iloc[[0, 1, 2, 3, 4, 5,6,7,8,9,10,11,12,90, 100]]
+        best_models = metrics_summary.iloc[[0, 1, 2, 3, 4 ,90, 100]]
         metric_values = get_metrics_knn(best_models, df_combined, metric)
         data = pd.DataFrame()
         for el, (i,row) in zip(metric_values, best_models.iterrows()):
