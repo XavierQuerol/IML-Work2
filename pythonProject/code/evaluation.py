@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 from scipy import stats
 import scikit_posthocs as sp
+from scipy import stats
 
 
 def read_csv(folder_path, dataset_name, reduction_mode):
@@ -102,7 +103,7 @@ def get_metrics_svm(best_models, df_combined, metric):
     
     return metric_values
 
-
+from matplotlib.ticker import FixedLocator
 def plot_violin(data, metric, ax):
     """Helper function to plot the violin and strip plot."""
     sns.violinplot(data=data, ax=ax, inner=None, palette="pastel", linewidth=1.5)
@@ -112,6 +113,7 @@ def plot_violin(data, metric, ax):
     ax.set_title(f"Model {metric} Values", fontsize=16, fontweight='bold')
     ax.set_ylabel(metric, fontsize=14)
     ax.set_xlabel("Models", fontsize=14)
+    ax.xaxis.set_major_locator(FixedLocator(ax.get_xticks()))
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)
 
 
@@ -121,7 +123,7 @@ def plot_test(data, metric, results=None, autorank=False):
         fig, axs = plt.subplots(2, 1, figsize=(5, 6), gridspec_kw={'height_ratios': [2, 5]})
         
         # Plot autorank results in the first subplot
-        plot_stats(results, ax=axs[0])
+        plot_stats(results, ax=axs[0], allow_insignificant=True)
         axs[0].set_title("Autorank Results")
         
         # Plot the violin in the second subplot
@@ -190,9 +192,9 @@ def evaluate_model(dataset_name, method, metric, type_evaluation= 'our_criteria'
     distances = {'minkowski1': 'm1', 'minkowski2': 'm2', 'HEOM': 'H'}
     weighting = {'Mutual_classifier':'MC', 'Relief': 'R', 'ANOVA': 'A'}
 
-    df_combined = read_csv(f'results_{method}', dataset_name, False)
+    df_combined = read_csv(f'../results_{method}', dataset_name, False)
     metrics_summary, best_hyperparams = aggregate_metrics(df_combined, method)
-    metrics_summary.to_csv(f'results_{method}/results_{dataset_name}_all.csv', index=False)
+    metrics_summary.to_csv(f'../results_{method}/results_{dataset_name}_all.csv', index=False)
 
     if method == 'knn':
         best_models = metrics_summary.iloc[[0, 1, 2, 3, 4 ,90, 100]]
@@ -267,23 +269,25 @@ def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, 
     num_samples = {'grid': 1700, 'sick': 3395}
     
     # Load original data
-    results = read_csv(f'results_{method}', dataset_name, False)
+    results = read_csv(f'../results_{method}', dataset_name, False)
     # Filter original data based on best parameters
     params = best_params[dataset_name][method]
     for key, value in params.items():
         results = results[results[key] == value]
 
-    results_reduced = read_csv(f'results_{method}_reduced', dataset_name, reduction_method)
+    results_reduced = read_csv(f'../results_{method}_reduced', dataset_name, reduction_method)
 
     data_accuracy = pd.DataFrame({
         'Original': list(results['Accuracy']), 
-        'Reduced': list(results_reduced['Accuracy'])
+        f'Reduced {reduction_method}': list(results_reduced['Accuracy'])
     })
     data_solving_time = pd.DataFrame({
         'Original': list(results['Solving Time']), 
-        'Reduced': list(results_reduced['Solving Time'])
+        f'Reduced {reduction_method}': list(results_reduced['Solving Time'])
     })
 
+    p_value_ttest_ac = None
+    p_value_ttest_st = None
     if type_evaluation == 'our_criteria':
         print('Evaluating Accuracy')
         p_value_ttest_ac = evaluation_t_test(data_accuracy, 'Accuracy', 0.05, plot=plot)
@@ -296,9 +300,7 @@ def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, 
         evaluation_test_autorank(data_solving_time, 'Solving Time', 0.05, plot=plot)
     
     if summary_statistics is not None:
-        if not p_value_ttest_ac:
-            p_value_ttest_ac = None
-            p_value_ttest_st = None
+
         # Calculate statistics for both metrics in the original data
         original_accuracy = calculate_statistics(results, 'Accuracy')
         original_solving_time = calculate_statistics(results, 'Solving Time')
@@ -331,8 +333,8 @@ def evaluate_reduction(dataset_name, method, reduction_method, type_evaluation, 
                 'Accuracy': [reduced_accuracy],
                 'Solving Time': [reduced_solving_time],
                 'Num Samples': [reduced_num_samples],
-                'P-value Acc': [f"{p_value_ttest_ac:.4f}"],
-                'P-value ST': [f"{p_value_ttest_st:.4f}"]
+                'P-value Acc': [f"{p_value_ttest_ac:.4f}" if p_value_ttest_ac is not None else None],
+                'P-value ST': [f"{p_value_ttest_st:.4f}" if p_value_ttest_ac is not None else None]
             })
         ], ignore_index=True)
 
@@ -351,3 +353,61 @@ def evaluate_all_reductions(type_evaluation, plot=False):
 
     summary_statistics = summary_statistics.drop_duplicates()
     return summary_statistics
+
+
+def get_user_choice(prompt, options, is_numeric = False):
+    while True:
+        print(prompt)
+        for i, option in enumerate(options, 1):
+            if is_numeric:
+                print(f"  {option}")
+            else:
+                print(f" {i}. {option}")
+        choice = input("Please enter the number of your choice: ")
+
+        if choice in options or (is_numeric and int(choice) in options):
+            return choice
+        if not is_numeric and choice.isdigit() and 1 <= int(choice) <= len(options):
+            return options[int(choice) - 1]
+        else:
+            print("Invalid choice. Try again.\n")
+
+def startProgram():
+    print("Welcome to our KNN and SVM application.")
+
+    mode = get_user_choice("Please, select if you want to compare the best models without reduction among them or compare the best model with the reduction instances models:", ["Best models", "Reduction models"])
+    all_modes = get_user_choice("Please, select if you want to do all the tests:", ["Yes", "No"])
+
+    if all_modes == 'Yes':
+        if mode == 'Best models':
+            evaluate_all_models(type_evaluation='autorank', plot=True)
+        elif mode == 'Reduction models':
+            summary_statistics = evaluate_all_reductions(type_evaluation='our_criteria', plot=True)
+            print(summary_statistics)
+
+    elif all_modes == 'No':
+        dataset = get_user_choice("Please, select the dataset you would like to evaluate:", ["sick", "grid"])
+        alg = get_user_choice("Please, select the algorithm to use:", ["knn", "svm"])
+
+        if mode == 'Best models':
+            metric = get_user_choice("Please, select the algorithm to evaluate:", ["Accuracy", "Solving Time"])
+            evaluate_model(dataset, alg, metric, type_evaluation='autorank', plot=True)
+        elif mode == 'Reduction models':
+            instance_reduction = get_user_choice("Please, select the reduction to evaluate:",
+                                                 ["No", "CNN", "GCNN", "EEN", "EENTh", "DROP1", "DROP2", "DROP3"])
+            evaluate_reduction(dataset, alg, instance_reduction, type_evaluation='our_criteria',
+                               summary_statistics=None,
+                               plot=True)
+
+def main():
+    ans = "y"
+    while ans.lower() == "y":
+        startProgram()
+        ans = input("Do you want to do evaluate more results? (y/n)")
+
+        while ans != "y" and ans != "n":
+            print("Invalid choice. Try again.")
+            ans = input("Do you want to do evaluate more results? (y/n)")
+
+if __name__ == "__main__":
+    main()

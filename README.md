@@ -41,3 +41,15 @@ Then a menu will be displayed with the instructions to execute any combination o
 - You can put both the number in the left side of the parameter and the name of the parameter itself as shown in the options.
 
 If you want to run all the KNN options you can choose to do it one by one through the main menu or by executing the function runAllKNN present in the file main.py. We recommend the first option because running everything is a very long process.
+
+
+Execute evaluation.py to validate differences among the best models and evaluate the reduction effect. Results are precomputed.
+```bash
+ python3 evaluation.py
+ ```
+
+
+Execute graphics.py to show the graphics included in the report. Results are precomputed.
+```bash
+ python3 graphics.py
+ ```
