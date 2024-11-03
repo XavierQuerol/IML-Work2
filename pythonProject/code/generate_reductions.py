@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from code.reductions import CNN_GCNN, EENTh, DROP
+from reductions import CNN_GCNN, EENTh, DROP
 
 from knn import callKNN
 from svm import callSVM
