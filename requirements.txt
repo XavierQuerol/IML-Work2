@@ -1,5 +1,9 @@
-numpy==1.23.5
-pandas==1.5.3
-scikit_learn==1.2.1
-scipy==1.9.3
+numpy==1.26.4
+pandas==2.2.2
+scikit_learn==1.5.1
+scipy==1.13.1
 sklearn_relief==1.0.0b2
+autorank==1.2.1
+seaborn==0.13.2
+statsmodels==0.14.4
+scikit-posthocs==0.10.0
