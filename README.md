@@ -1,4 +1,3 @@
-Steps to run the script:
 
 ### Team
 - Aina Llaneras
@@ -53,3 +52,17 @@ Execute graphics.py to show the graphics included in the report. Results are pre
 ```bash
  python3 graphics.py
  ```
+
+ ### Folder structure
+
+    ├── code                   # .py files
+    ├── documentation          # Documentation about reduction methods
+    ├── grid                   # Source files about grid dataset
+    ├── grid_csv               # Generated files about grid dataset
+    ├── sick                   # Source files about sick dataset
+    ├── sick_csv               # Generated files about sick dataset
+    ├── results_knn            # Results of knn algorithm
+    ├── results_knn_reduced    # Results of knn algorithm after reductions
+    ├── results_svm            # Results of svm algorithm
+    ├── results_svm_reduced    # Results of svm algorithm after reductions
+    └── README.md
